@@ -1,0 +1,17 @@
+{
+  "name": "garage-finance-backend",
+  "version": "1.0.0",
+  "description": "Finance invoicing API for car garage",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "seed": "node src/seed.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}

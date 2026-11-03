@@ -1,0 +1,42 @@
+{
+  "customer": {
+    "name": "Example Customer LLC",
+    "trn_id": "100000000000003",
+    "mobile": "+971 50 000 0000",
+    "address": "Dubai, UAE"
+  },
+  "invoice": {
+    "number": "TEST-INV-001",
+    "date": "2026-11-03",
+    "job_order_number": "JO-1001",
+    "vehicle": {
+      "make": "Example Motors",
+      "model_year": "2024",
+      "plate_number": "DUBAI 12345",
+      "mileage": "24,500 km"
+    }
+  },
+  "items": [
+    {
+      "description": "Example repair service",
+      "unit": "Job",
+      "quantity": "1",
+      "rate_aed": "250.00",
+      "vat_percent": "5",
+      "vat_amount_aed": "12.50",
+      "amount_aed": "250.00"
+    }
+  ],
+  "notes": "Example data only. Replace with your system's invoice values.",
+  "totals": {
+    "subtotal_aed": "250.00",
+    "discount_aed": "0.00",
+    "vat_total_aed": "12.50",
+    "net_total_aed": "262.50"
+  },
+  "signatures": {
+    "prepared_by": "Example User",
+    "authorized_signature_name": "",
+    "customer_received_by": ""
+  }
+}
