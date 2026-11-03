@@ -1,5 +1,7 @@
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 async function request(path, options = {}) {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE}/api${path}`, {
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     ...options,
   });
@@ -32,7 +34,7 @@ export const api = {
     request(`/invoices/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteInvoice: (id) => request(`/invoices/${id}`, { method: 'DELETE' }),
   downloadInvoicePdf: async (id, filename = 'invoice.pdf') => {
-    const res = await fetch(`/api/invoices/${id}/pdf`);
+    const res = await fetch(`${API_BASE}/api/invoices/${id}/pdf`);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.error || 'Failed to download PDF');
