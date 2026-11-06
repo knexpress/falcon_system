@@ -2,6 +2,8 @@ import { Router } from 'express';
 import db from '../db.js';
 import { calcTotals, nextInvoiceNumber } from '../utils.js';
 import { generateInvoicePdf } from '../generatePdf.js';
+import { syncInvoiceSale } from '../syncInvoiceSale.js';
+import { upsertVehicleFromInvoice } from '../vehicles.js';
 
 const router = Router();
 
@@ -153,18 +155,29 @@ router.post('/', (req, res) => {
     : 'draft';
 
   const create = db.transaction(() => {
+    const vehicleId = upsertVehicleFromInvoice({
+      customer_id,
+      vehicle_make,
+      vehicle_model,
+      vehicle_year,
+      vehicle_plate,
+      vehicle_vin,
+      mileage,
+    });
+
     const result = db
       .prepare(
         `INSERT INTO invoices (
-          invoice_number, customer_id, vehicle_make, vehicle_model, vehicle_year,
+          invoice_number, customer_id, vehicle_id, vehicle_make, vehicle_model, vehicle_year,
           vehicle_plate, vehicle_vin, job_order_no, mileage, issue_date, due_date,
           status, notes, prepared_by, authorized_by, received_by, labor_total,
           parts_total, tax_rate, tax_amount, discount, subtotal, total
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         invoiceNumber,
         customer_id,
+        vehicleId,
         vehicle_make || null,
         vehicle_model || null,
         vehicle_year || null,
@@ -209,21 +222,14 @@ router.post('/', (req, res) => {
       );
     }
 
-    if (create_sale && validStatus === 'paid' && totals.total > 0) {
-      db.prepare(
-        `INSERT INTO sales
-         (invoice_id, sale_date, description, category, amount, payment_method, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).run(
-        invoiceId,
-        issue_date,
-        `Payment for ${invoiceNumber}`,
-        'invoice',
-        totals.total,
-        'invoice',
-        notes || null
-      );
-    }
+    syncInvoiceSale({
+      invoiceId,
+      invoiceNumber,
+      issueDate: issue_date,
+      status: validStatus,
+      total: totals.total,
+      notes,
+    });
 
     return invoiceId;
   });
@@ -303,9 +309,19 @@ router.put('/:id', (req, res) => {
     : existing.status;
 
   const update = db.transaction(() => {
+    const vehicleId = upsertVehicleFromInvoice({
+      customer_id,
+      vehicle_make,
+      vehicle_model,
+      vehicle_year,
+      vehicle_plate,
+      vehicle_vin,
+      mileage,
+    });
+
     db.prepare(
       `UPDATE invoices SET
-        customer_id = ?, vehicle_make = ?, vehicle_model = ?, vehicle_year = ?,
+        customer_id = ?, vehicle_id = ?, vehicle_make = ?, vehicle_model = ?, vehicle_year = ?,
         vehicle_plate = ?, vehicle_vin = ?, job_order_no = ?, mileage = ?,
         issue_date = ?, due_date = ?, status = ?, notes = ?, prepared_by = ?,
         authorized_by = ?, received_by = ?, labor_total = ?, parts_total = ?,
@@ -314,6 +330,7 @@ router.put('/:id', (req, res) => {
        WHERE id = ?`
     ).run(
       customer_id,
+      vehicleId,
       vehicle_make || null,
       vehicle_model || null,
       vehicle_year || null,
@@ -362,31 +379,14 @@ router.put('/:id', (req, res) => {
       );
     }
 
-    if (
-      create_sale &&
-      validStatus === 'paid' &&
-      existing.status !== 'paid' &&
-      totals.total > 0
-    ) {
-      const already = db
-        .prepare('SELECT id FROM sales WHERE invoice_id = ?')
-        .get(req.params.id);
-      if (!already) {
-        db.prepare(
-          `INSERT INTO sales
-           (invoice_id, sale_date, description, category, amount, payment_method, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).run(
-          req.params.id,
-          issue_date,
-          `Payment for ${existing.invoice_number}`,
-          'invoice',
-          totals.total,
-          'invoice',
-          notes || null
-        );
-      }
-    }
+    syncInvoiceSale({
+      invoiceId: Number(req.params.id),
+      invoiceNumber: existing.invoice_number,
+      issueDate: issue_date,
+      status: validStatus,
+      total: totals.total,
+      notes,
+    });
   });
 
   update();

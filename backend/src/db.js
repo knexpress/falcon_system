@@ -89,6 +89,53 @@ db.exec(`
     notes TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS inventory_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sku TEXT UNIQUE,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'parts',
+    unit TEXT NOT NULL DEFAULT 'Pcs',
+    quantity_on_hand REAL NOT NULL DEFAULT 0,
+    reorder_level REAL NOT NULL DEFAULT 0,
+    cost_price REAL NOT NULL DEFAULT 0,
+    sell_price REAL NOT NULL DEFAULT 0,
+    supplier TEXT,
+    location TEXT,
+    notes TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS inventory_movements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER NOT NULL,
+    movement_type TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    unit_cost REAL,
+    balance_after REAL NOT NULL,
+    reference TEXT,
+    notes TEXT,
+    movement_date TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (item_id) REFERENCES inventory_items(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS vehicles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id INTEGER,
+    make TEXT,
+    model TEXT,
+    year TEXT,
+    plate_number TEXT,
+    vin TEXT,
+    mileage TEXT,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
+  );
 `);
 
 function ensureColumn(table, column, definition) {
@@ -105,6 +152,7 @@ ensureColumn('invoices', 'discount', 'REAL NOT NULL DEFAULT 0');
 ensureColumn('invoices', 'prepared_by', 'TEXT');
 ensureColumn('invoices', 'authorized_by', 'TEXT');
 ensureColumn('invoices', 'received_by', 'TEXT');
+ensureColumn('invoices', 'vehicle_id', 'INTEGER');
 ensureColumn('invoice_items', 'unit', "TEXT NOT NULL DEFAULT 'Job'");
 ensureColumn('invoice_items', 'vat_rate', 'REAL NOT NULL DEFAULT 5');
 ensureColumn('invoice_items', 'vat_amount', 'REAL NOT NULL DEFAULT 0');

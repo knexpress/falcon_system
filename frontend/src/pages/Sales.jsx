@@ -29,7 +29,13 @@ export default function Sales() {
     load();
   }, []);
 
-  const total = sales.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+  const invoiceIncome = sales
+    .filter((s) => s.invoice_id)
+    .reduce((sum, s) => sum + Number(s.amount || 0), 0);
+  const otherSales = sales
+    .filter((s) => !s.invoice_id)
+    .reduce((sum, s) => sum + Number(s.amount || 0), 0);
+  const total = invoiceIncome + otherSales;
 
   function openCreate() {
     setEditingId(null);
@@ -78,17 +84,28 @@ export default function Sales() {
     <div>
       <header className="page-header">
         <div>
-          <h1>Sales</h1>
-          <p>Income from jobs, walk-ins, and paid invoices.</p>
+          <h1>Sales / Income</h1>
+          <p>
+            Paid invoices are counted as income automatically. Add walk-in sales
+            separately if needed.
+          </p>
         </div>
         <button className="btn btn-primary" onClick={openCreate}>
-          Add sale
+          Add walk-in sale
         </button>
       </header>
 
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+      <div className="stats-grid">
         <div className="stat-card accent">
-          <p className="stat-label">Total sales</p>
+          <p className="stat-label">Invoice income</p>
+          <p className="stat-value">{formatMoney(invoiceIncome)}</p>
+        </div>
+        <div className="stat-card">
+          <p className="stat-label">Walk-in / other</p>
+          <p className="stat-value">{formatMoney(otherSales)}</p>
+        </div>
+        <div className="stat-card ok">
+          <p className="stat-label">Total income</p>
           <p className="stat-value">{formatMoney(total)}</p>
         </div>
         <div className="stat-card">

@@ -21,7 +21,7 @@ export default function InvoiceDetail() {
     if (!window.confirm(`Delete ${invoice.invoice_number}?`)) return;
     try {
       await api.deleteInvoice(id);
-      navigate('/invoices');
+      navigate('/app/invoices');
     } catch (err) {
       setError(err.message);
     }
@@ -56,10 +56,10 @@ export default function InvoiceDetail() {
           </p>
         </div>
         <div className="row-actions">
-          <Link className="btn btn-ghost" to="/invoices">
+          <Link className="btn btn-ghost" to="/app/invoices">
             Back
           </Link>
-          <Link className="btn btn-ghost" to={`/invoices/${id}/edit`}>
+          <Link className="btn btn-ghost" to={`/app/invoices/${id}/edit`}>
             Edit
           </Link>
           <button

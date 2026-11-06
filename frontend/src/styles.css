@@ -613,6 +613,37 @@ tr:hover td {
   grid-template-columns: 56px 2fr 0.7fr 0.7fr 0.9fr 0.7fr auto;
 }
 
+.pricing-item-block {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pricing-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pricing-item-no {
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+  font-size: 1.2rem;
+  color: var(--accent-dark);
+}
+
+.pricing-item-row {
+  grid-template-columns: 2.4fr 0.7fr 0.7fr 0.9fr 0.7fr;
+}
+
+.pricing-item-row .span-desc {
+  grid-column: auto;
+}
+
 @media print {
   .no-print,
   .sidebar,

@@ -18,9 +18,22 @@ router.get('/', (_req, res) => {
     )
     .get();
 
-  const salesTotal = db
-    .prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM sales')
+  // Income = paid invoices + walk-in/manual sales (not linked to an invoice)
+  const invoiceIncome = db
+    .prepare(
+      `SELECT COALESCE(SUM(total), 0) AS total
+       FROM invoices WHERE status = 'paid'`
+    )
     .get().total;
+
+  const otherSales = db
+    .prepare(
+      `SELECT COALESCE(SUM(amount), 0) AS total
+       FROM sales WHERE invoice_id IS NULL`
+    )
+    .get().total;
+
+  const salesTotal = invoiceIncome + otherSales;
 
   const expensesTotal = db
     .prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses')
@@ -28,12 +41,23 @@ router.get('/', (_req, res) => {
 
   const monthPrefix = new Date().toISOString().slice(0, 7);
 
-  const monthSales = db
+  const monthInvoiceIncome = db
     .prepare(
-      `SELECT COALESCE(SUM(amount), 0) AS total
-       FROM sales WHERE sale_date LIKE ?`
+      `SELECT COALESCE(SUM(total), 0) AS total
+       FROM invoices
+       WHERE status = 'paid' AND issue_date LIKE ?`
     )
     .get(`${monthPrefix}%`).total;
+
+  const monthOtherSales = db
+    .prepare(
+      `SELECT COALESCE(SUM(amount), 0) AS total
+       FROM sales
+       WHERE invoice_id IS NULL AND sale_date LIKE ?`
+    )
+    .get(`${monthPrefix}%`).total;
+
+  const monthSales = monthInvoiceIncome + monthOtherSales;
 
   const monthExpenses = db
     .prepare(
@@ -75,18 +99,48 @@ router.get('/', (_req, res) => {
     )
     .all();
 
+  const inventorySummary = db
+    .prepare(
+      `SELECT
+         COUNT(*) AS inventory_items,
+         SUM(CASE WHEN is_active = 1 AND quantity_on_hand <= reorder_level THEN 1 ELSE 0 END) AS low_stock_count,
+         COALESCE(SUM(CASE WHEN is_active = 1 THEN quantity_on_hand * cost_price ELSE 0 END), 0) AS stock_value
+       FROM inventory_items`
+    )
+    .get();
+
+  const lowStockItems = db
+    .prepare(
+      `SELECT id, sku, name, quantity_on_hand, reorder_level, unit
+       FROM inventory_items
+       WHERE is_active = 1 AND quantity_on_hand <= reorder_level
+       ORDER BY quantity_on_hand ASC
+       LIMIT 5`
+    )
+    .all();
+
   res.json({
     ...invoiceStats,
+    invoice_income: invoiceIncome,
+    other_sales: otherSales,
     sales_total: salesTotal,
+    income_total: salesTotal,
     expenses_total: expensesTotal,
     profit: salesTotal - expensesTotal,
+    month_invoice_income: monthInvoiceIncome,
+    month_other_sales: monthOtherSales,
     month_sales: monthSales,
+    month_income: monthSales,
     month_expenses: monthExpenses,
     month_profit: monthSales - monthExpenses,
     recent_invoices: recentInvoices,
     recent_expenses: recentExpenses,
     sales_by_category: salesByCategory,
     expenses_by_category: expensesByCategory,
+    inventory_items: inventorySummary.inventory_items || 0,
+    low_stock_count: inventorySummary.low_stock_count || 0,
+    stock_value: Math.round((inventorySummary.stock_value || 0) * 100) / 100,
+    low_stock_items: lowStockItems,
   });
 });
 

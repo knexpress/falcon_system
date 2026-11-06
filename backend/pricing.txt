@@ -1,0 +1,119 @@
+FALCON AUTO DETAILING & PAINTING COMPLETE SERVICE PRICE LIST Currency: AED
+
+==================================================
+
+PAINTLESS DENT REPAIR (PDR)
+
+Dropdown Name: Select Dent Size
+
+1cm - 5cm : 199 AED 6cm - 10cm : 299 AED 11cm - 15cm : 399 AED 16cm - 20cm : 549 AED 21cm - 30cm : 699 AED 31cm - 40cm : 899 AED 41cm - 50cm : 999 AED
+
+==================================================
+
+ADDITIONAL PDR CHARGES
+
+Dropdown Name: Additional Services
+
+Interior Panel Dismantle : 89 AED Full Panel Removal & Fixing + Computer Reprogramming : 250 AED After Denting Cutting & Polishing (Per Panel) : 50 AED Brush Touch-Up Paint : 50 AED Bumper Clip Fixing and Alignment : 199 AED Panel Fitting : 199 AED Roof Ceiling Dent Access - Removing & Fixing : 299 AED
+
+==================================================
+
+BODY & PAINT PACKAGE
+
+Dropdown Name: Select Vehicle Type
+
+Hatchback / Small Car : 3,600 AED Sedan : 4,000 AED SUV / Crossover : 4,600 AED Large SUV : 5,300 AED Pickup Truck : 4,800 AED Van / Minivan : 5,100 AED
+
+==================================================
+
+BODY PANEL PAINTING PRICES
+
+Dropdown 1: Select Vehicle Type Dropdown 2: Select Panel
+
+PANEL SUV SEDAN
+
+Hood / Bonnet 750 600 Front Fender (One Side) 500 400 Front Door (One Side) 550 400 Rear Door (One Side) 550 400 Quarter Panel (One Side) 650 400 Roof 1,000 800 Trunk Lid / Tailgate 500 400 Front Bumper 700 600 Rear Bumper 650 600
+
+All prices are in AED.
+
+==================================================
+
+PLASTIC & TRIM PARTS
+
+Dropdown 1: Select Vehicle Type Dropdown 2: Select Service
+
+SERVICE SUV SEDAN
+
+Side Mirror (Each) 99 99 Door Handle (Each) 50 50 Front Grille (Black Paint) 350 300 Side Skirt (One Side) 370 330 Fender Flare (One Side) 350 300
+
+All prices are in AED.
+
+==================================================
+
+EXTRA SERVICES
+
+Dropdown 1: Select Vehicle Type Dropdown 2: Select Service
+
+SERVICE SUV SEDAN
+
+Fuel Door 150 150 Full Emblem 250 200 All Matte Black Exterior Trims 650 600
+
+All prices are in AED.
+
+==================================================
+
+RIMS & CALIPERS
+
+Dropdown 1: Select Vehicle Type Dropdown 2: Select Service
+
+SERVICE SUV SEDAN
+
+1 Rim Repaint 300 250 4 Rims Repaint 800 800 1 Caliper Repaint 300 300 4 Calipers Repaint 650 600
+
+All prices are in AED.
+
+==================================================
+
+DETAILING SERVICES
+
+Dropdown 1: Select Vehicle Type Dropdown 2: Select Service
+
+SERVICE SUV SEDAN
+
+Headlight Restoration (2 PCS) 399 350 Full Diamond Polish (3 Stage Polish) 650 600 Engine Detailing 300 250 Interior Deep Detailing - Flooring Shampoo & Steam 549 499
+
+All prices are in AED.
+
+================================================== DROPDOWN STRUCTURE FOR WEBSITE / BOOKING SYSTEM
+
+MAIN SERVICE DROPDOWN:
+
+Paintless Dent Repair (PDR)
+Additional PDR Charges
+Body & Paint Package
+Body Panel Painting
+Plastic & Trim Parts
+Extra Services
+Rims & Calipers
+Detailing Services
+
+VEHICLE TYPE DROPDOWN:
+
+Hatchback / Small Car
+Sedan
+SUV / Crossover
+Large SUV
+Pickup Truck
+Van / Minivan
+
+CUSTOMER BOOKING FLOW:
+
+Step 1: Select Main Service Step 2: Select Vehicle Type (where applicable) Step 3: Select Service / Panel / Dent Size Step 4: Select Quantity Step 5: Display Individual Service Price Step 6: Calculate Total Amount Automatically
+
+NOTE:
+
+All prices are in UAE Dirhams (AED).
+Prices for SUV and Sedan are listed separately where applicable.
+PDR additional services can be selected separately.
+Multiple services should be allowed in one quotation.
+The system should automatically calculate the total price.

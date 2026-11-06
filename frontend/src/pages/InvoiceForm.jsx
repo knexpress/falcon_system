@@ -2,6 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, todayISO } from '../api.js';
 import { InvoiceDocumentPreview } from '../components/InvoiceDocument.jsx';
+import {
+  MAIN_SERVICES,
+  categoryNeedsVehicle,
+  categoryUsesSuvSedan,
+  getOptionList,
+  getVehicleOptions,
+  resolvePricing,
+} from '../data/pricingCatalog.js';
 
 const emptyItem = () => ({
   description: '',
@@ -10,6 +18,9 @@ const emptyItem = () => ({
   quantity: 1,
   unit_price: 0,
   vat_rate: 5,
+  pricing_category: '',
+  pricing_vehicle: '',
+  pricing_option: '',
 });
 
 export default function InvoiceForm() {
@@ -87,6 +98,9 @@ export default function InvoiceForm() {
                   quantity: item.quantity,
                   unit_price: item.unit_price,
                   vat_rate: item.vat_rate ?? 5,
+                  pricing_category: 'custom',
+                  pricing_vehicle: '',
+                  pricing_option: '',
                 }))
               : [emptyItem()],
           create_sale: true,
@@ -117,6 +131,57 @@ export default function InvoiceForm() {
       );
       return { ...prev, items };
     });
+  }
+
+  function applyPricing(index, patch) {
+    setForm((prev) => {
+      const items = prev.items.map((item, i) => {
+        if (i !== index) return item;
+        const next = { ...item, ...patch };
+        const resolved = resolvePricing(
+          next.pricing_category,
+          next.pricing_vehicle,
+          next.pricing_option
+        );
+        if (resolved) {
+          next.description = resolved.description;
+          next.unit_price = resolved.unit_price;
+          next.unit = resolved.unit;
+        }
+        return next;
+      });
+      return { ...prev, items };
+    });
+  }
+
+  function onPricingCategory(index, categoryId) {
+    applyPricing(index, {
+      pricing_category: categoryId,
+      pricing_vehicle: '',
+      pricing_option: '',
+      description: categoryId === 'custom' ? '' : '',
+      unit_price: categoryId === 'custom' ? 0 : 0,
+    });
+  }
+
+  function onPricingVehicle(index, vehicleId) {
+    const item = form.items[index];
+    // Body package: vehicle IS the option
+    if (item.pricing_category === 'body_package') {
+      applyPricing(index, {
+        pricing_vehicle: vehicleId,
+        pricing_option: vehicleId,
+      });
+      return;
+    }
+    applyPricing(index, {
+      pricing_vehicle: vehicleId,
+      pricing_option: '',
+    });
+  }
+
+  function onPricingOption(index, optionId) {
+    applyPricing(index, { pricing_option: optionId });
   }
 
   function addItem() {
@@ -155,7 +220,7 @@ export default function InvoiceForm() {
       const saved = isEdit
         ? await api.updateInvoice(id, payload)
         : await api.createInvoice(payload);
-      navigate(`/invoices/${saved.id}`);
+      navigate(`/app/invoices/${saved.id}`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -181,7 +246,7 @@ export default function InvoiceForm() {
           >
             {showPreview ? 'Hide preview' : 'Show preview'}
           </button>
-          <Link className="btn btn-ghost" to="/invoices">
+          <Link className="btn btn-ghost" to="/app/invoices">
             Cancel
           </Link>
         </div>
@@ -236,6 +301,10 @@ export default function InvoiceForm() {
           </div>
 
           <h2 className="form-section-title">Invoice details</h2>
+          <p className="muted" style={{ marginTop: -6, marginBottom: 12 }}>
+            Vehicle details are saved automatically to Vehicles (matched by plate
+            / VIN) with full service history.
+          </p>
           <div className="form-grid three">
             <div className="field">
               <label>Date *</label>
@@ -337,80 +406,193 @@ export default function InvoiceForm() {
           </div>
 
           <h2 className="form-section-title">Line items (max 14)</h2>
+          <p className="muted" style={{ marginTop: -6, marginBottom: 12 }}>
+            Pick a service category → vehicle (if needed) → option. Rate fills
+            automatically from the Falcon price list.
+          </p>
           <div className="items-editor template-items">
-            {form.items.map((item, index) => (
-              <div className="item-row template-item-row" key={index}>
-                <div className="field">
-                  <label>No.</label>
-                  <input className="input" disabled value={index + 1} />
+            {form.items.map((item, index) => {
+              const needsVehicle = categoryNeedsVehicle(item.pricing_category);
+              const isBodyPackage = item.pricing_category === 'body_package';
+              const isCustom =
+                item.pricing_category === 'custom' || !item.pricing_category;
+              const vehicleOptions = getVehicleOptions(item.pricing_category);
+              const optionList = isBodyPackage
+                ? []
+                : getOptionList(item.pricing_category);
+              const optionLabel =
+                item.pricing_category === 'pdr'
+                  ? 'Select Dent Size'
+                  : item.pricing_category === 'panel_paint'
+                    ? 'Select Panel'
+                    : 'Select Service';
+
+              return (
+                <div className="pricing-item-block" key={index}>
+                  <div className="pricing-item-head">
+                    <span className="pricing-item-no">#{index + 1}</span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => removeItem(index)}
+                      disabled={form.items.length === 1}
+                    >
+                      Remove
+                    </button>
+                  </div>
+
+                  <div className="form-grid three">
+                    <div className="field">
+                      <label>Main Service</label>
+                      <select
+                        className="select"
+                        value={item.pricing_category}
+                        onChange={(e) =>
+                          onPricingCategory(index, e.target.value)
+                        }
+                      >
+                        <option value="">Select service…</option>
+                        {MAIN_SERVICES.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {needsVehicle && (
+                      <div className="field">
+                        <label>
+                          {isBodyPackage || categoryUsesSuvSedan(item.pricing_category)
+                            ? 'Vehicle Type'
+                            : 'Vehicle Type'}
+                        </label>
+                        <select
+                          className="select"
+                          value={item.pricing_vehicle}
+                          onChange={(e) =>
+                            onPricingVehicle(index, e.target.value)
+                          }
+                        >
+                          <option value="">Select vehicle…</option>
+                          {vehicleOptions.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.label}
+                              {v.price != null ? ` — ${v.price} AED` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {!isBodyPackage &&
+                      item.pricing_category &&
+                      item.pricing_category !== 'custom' && (
+                        <div className="field">
+                          <label>{optionLabel}</label>
+                          <select
+                            className="select"
+                            value={item.pricing_option}
+                            onChange={(e) =>
+                              onPricingOption(index, e.target.value)
+                            }
+                            disabled={
+                              needsVehicle &&
+                              !isBodyPackage &&
+                              !item.pricing_vehicle
+                            }
+                          >
+                            <option value="">Select…</option>
+                            {optionList.map((o) => {
+                              let priceHint = '';
+                              if (o.price != null) priceHint = ` — ${o.price} AED`;
+                              else if (item.pricing_vehicle === 'sedan' && o.sedan != null)
+                                priceHint = ` — ${o.sedan} AED`;
+                              else if (item.pricing_vehicle === 'suv' && o.suv != null)
+                                priceHint = ` — ${o.suv} AED`;
+                              else if (o.suv != null)
+                                priceHint = ` — SUV ${o.suv} / Sedan ${o.sedan}`;
+                              return (
+                                <option key={o.id} value={o.id}>
+                                  {o.label}
+                                  {priceHint}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      )}
+                  </div>
+
+                  <div className="item-row pricing-item-row">
+                    <div className="field span-desc">
+                      <label>Description</label>
+                      <input
+                        className="input"
+                        value={item.description}
+                        onChange={(e) =>
+                          updateItem(index, 'description', e.target.value)
+                        }
+                        placeholder={
+                          isCustom
+                            ? 'Type custom description'
+                            : 'Auto-filled from price list'
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <label>Unit</label>
+                      <input
+                        className="input"
+                        value={item.unit}
+                        onChange={(e) =>
+                          updateItem(index, 'unit', e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <label>Qty</label>
+                      <input
+                        className="input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.quantity}
+                        onChange={(e) =>
+                          updateItem(index, 'quantity', e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <label>Rate (AED)</label>
+                      <input
+                        className="input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.unit_price}
+                        onChange={(e) =>
+                          updateItem(index, 'unit_price', e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <label>VAT %</label>
+                      <input
+                        className="input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.vat_rate}
+                        onChange={(e) =>
+                          updateItem(index, 'vat_rate', e.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="field">
-                  <label>Description</label>
-                  <input
-                    className="input"
-                    value={item.description}
-                    onChange={(e) =>
-                      updateItem(index, 'description', e.target.value)
-                    }
-                  />
-                </div>
-                <div className="field">
-                  <label>Unit</label>
-                  <input
-                    className="input"
-                    value={item.unit}
-                    onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                  />
-                </div>
-                <div className="field">
-                  <label>Qty</label>
-                  <input
-                    className="input"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={item.quantity}
-                    onChange={(e) =>
-                      updateItem(index, 'quantity', e.target.value)
-                    }
-                  />
-                </div>
-                <div className="field">
-                  <label>Rate (AED)</label>
-                  <input
-                    className="input"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={item.unit_price}
-                    onChange={(e) =>
-                      updateItem(index, 'unit_price', e.target.value)
-                    }
-                  />
-                </div>
-                <div className="field">
-                  <label>VAT %</label>
-                  <input
-                    className="input"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={item.vat_rate}
-                    onChange={(e) =>
-                      updateItem(index, 'vat_rate', e.target.value)
-                    }
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => removeItem(index)}
-                  disabled={form.items.length === 1}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="toolbar" style={{ marginTop: 12 }}>
@@ -446,14 +628,10 @@ export default function InvoiceForm() {
             </div>
           </div>
 
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={form.create_sale}
-              onChange={(e) => updateField('create_sale', e.target.checked)}
-            />
-            Record a sale when status is set to paid
-          </label>
+          <p className="muted" style={{ marginTop: 12 }}>
+            When status is <strong>Paid</strong>, this invoice is automatically
+            counted in Sales / Income.
+          </p>
 
           <div className="modal-actions">
             <button className="btn btn-primary" disabled={saving}>

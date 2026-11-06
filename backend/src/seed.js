@@ -1,8 +1,49 @@
 import db from './db.js';
 
+function seedInventoryIfEmpty() {
+  const invCount = db.prepare('SELECT COUNT(*) AS c FROM inventory_items').get().c;
+  if (invCount > 0) return false;
+
+  const insertInv = db.prepare(
+    `INSERT INTO inventory_items
+     (sku, name, category, unit, quantity_on_hand, reorder_level, cost_price, sell_price, supplier, location, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const insertMove = db.prepare(
+    `INSERT INTO inventory_movements
+     (item_id, movement_type, quantity, unit_cost, balance_after, reference, notes, movement_date)
+     VALUES (?, 'in', ?, ?, ?, 'Opening stock', 'Seed', date('now'))`
+  );
+
+  const parts = [
+    ['PNT-WHT-01', 'Basecoat White 1L', 'paint', 'L', 12, 4, 85, 140, 'AutoColor UAE', 'Paint Bay A', null],
+    ['PNT-CLR-01', 'Clearcoat 1L', 'paint', 'L', 8, 3, 120, 190, 'AutoColor UAE', 'Paint Bay A', null],
+    ['CHM-DEG-01', 'Panel Degreaser 5L', 'chemicals', 'Can', 6, 2, 45, 75, 'DetailPro', 'Chem Shelf', null],
+    ['POL-DIA-01', 'Diamond Polish Compound', 'polish', 'Bottle', 10, 3, 55, 95, 'DetailPro', 'Detail Bay', null],
+    ['PRT-CLIP-01', 'Bumper Clip Assortment', 'parts', 'Box', 4, 2, 60, 110, 'AutoParts UAE', 'Parts Rack 2', null],
+    ['PRT-MIR-01', 'Side Mirror Cover (Universal)', 'parts', 'Pcs', 2, 3, 40, 99, 'AutoParts UAE', 'Parts Rack 1', 'Low stock sample'],
+    ['CNS-MASK-01', 'Masking Tape 48mm', 'consumables', 'Roll', 25, 10, 8, 15, 'Workshop Supply', 'Consumables', null],
+    ['CNS-SAND-01', 'Sandpaper P800 Pack', 'consumables', 'Pack', 15, 5, 18, 30, 'Workshop Supply', 'Consumables', null],
+  ];
+
+  const seedInv = db.transaction(() => {
+    for (const row of parts) {
+      const id = insertInv.run(...row).lastInsertRowid;
+      insertMove.run(id, row[4], row[6], row[4]);
+    }
+  });
+  seedInv();
+  return true;
+}
+
 const count = db.prepare('SELECT COUNT(*) AS c FROM customers').get().c;
 if (count > 0) {
-  console.log('Database already has data. Skipping seed.');
+  console.log('Database already has customer data. Skipping finance seed.');
+  if (seedInventoryIfEmpty()) {
+    console.log('Sample inventory seeded successfully.');
+  } else {
+    console.log('Inventory already has data. Skipping inventory seed.');
+  }
   process.exit(0);
 }
 
@@ -178,3 +219,6 @@ const seed = db.transaction(() => {
 
 seed();
 console.log('Sample garage data seeded successfully.');
+if (seedInventoryIfEmpty()) {
+  console.log('Sample inventory seeded successfully.');
+}

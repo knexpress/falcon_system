@@ -69,6 +69,49 @@ export const api = {
   updateExpense: (id, body) =>
     request(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteExpense: (id) => request(`/expenses/${id}`, { method: 'DELETE' }),
+
+  getInventory: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/inventory${qs ? `?${qs}` : ''}`);
+  },
+  getInventorySummary: () => request('/inventory/summary'),
+  getInventoryItem: (id) => request(`/inventory/${id}`),
+  getInventoryMovements: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/inventory/movements${qs ? `?${qs}` : ''}`);
+  },
+  createInventoryItem: (body) =>
+    request('/inventory', { method: 'POST', body: JSON.stringify(body) }),
+  updateInventoryItem: (id, body) =>
+    request(`/inventory/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteInventoryItem: (id) =>
+    request(`/inventory/${id}`, { method: 'DELETE' }),
+  stockIn: (id, body) =>
+    request(`/inventory/${id}/stock-in`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  stockOut: (id, body) =>
+    request(`/inventory/${id}/stock-out`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  stockAdjust: (id, body) =>
+    request(`/inventory/${id}/adjust`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  getVehicles: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/vehicles${qs ? `?${qs}` : ''}`);
+  },
+  getVehicle: (id) => request(`/vehicles/${id}`),
+  createVehicle: (body) =>
+    request('/vehicles', { method: 'POST', body: JSON.stringify(body) }),
+  updateVehicle: (id, body) =>
+    request(`/vehicles/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteVehicle: (id) => request(`/vehicles/${id}`, { method: 'DELETE' }),
 };
 
 export function formatMoney(value) {

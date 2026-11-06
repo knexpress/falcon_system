@@ -45,7 +45,7 @@ export default function Invoices() {
           <h1>Invoices</h1>
           <p>Create, edit, and track customer job invoices.</p>
         </div>
-        <Link className="btn btn-primary" to="/invoices/new">
+        <Link className="btn btn-primary" to="/app/invoices/new">
           New invoice
         </Link>
       </header>
@@ -101,7 +101,7 @@ export default function Invoices() {
               {invoices.map((inv) => (
                 <tr key={inv.id}>
                   <td>
-                    <Link to={`/invoices/${inv.id}`}>{inv.invoice_number}</Link>
+                    <Link to={`/app/invoices/${inv.id}`}>{inv.invoice_number}</Link>
                   </td>
                   <td>{inv.customer_name}</td>
                   <td>
@@ -116,7 +116,7 @@ export default function Invoices() {
                   <td>{formatMoney(inv.total)}</td>
                   <td>
                     <div className="row-actions">
-                      <Link className="btn btn-ghost btn-sm" to={`/invoices/${inv.id}/edit`}>
+                      <Link className="btn btn-ghost btn-sm" to={`/app/invoices/${inv.id}/edit`}>
                         Edit
                       </Link>
                       <button

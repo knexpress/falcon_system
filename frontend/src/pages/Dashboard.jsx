@@ -33,15 +33,15 @@ export default function Dashboard() {
           <h1>Dashboard</h1>
           <p>Workshop cashflow, invoices, and books at a glance.</p>
         </div>
-        <Link className="btn btn-primary" to="/invoices/new">
+        <Link className="btn btn-primary" to="/app/invoices/new">
           New invoice
         </Link>
       </header>
 
       <div className="stats-grid">
         <div className="stat-card accent">
-          <p className="stat-label">Month sales</p>
-          <p className="stat-value">{formatMoney(data.month_sales)}</p>
+          <p className="stat-label">Month income</p>
+          <p className="stat-value">{formatMoney(data.month_income ?? data.month_sales)}</p>
         </div>
         <div className="stat-card warn">
           <p className="stat-label">Month expenses</p>
@@ -54,6 +54,27 @@ export default function Dashboard() {
         <div className="stat-card">
           <p className="stat-label">Outstanding</p>
           <p className="stat-value">{formatMoney(data.outstanding_amount)}</p>
+        </div>
+      </div>
+
+      <div className="stats-grid" style={{ marginTop: 0 }}>
+        <div className="stat-card">
+          <p className="stat-label">Income from paid invoices</p>
+          <p className="stat-value">{formatMoney(data.invoice_income || 0)}</p>
+        </div>
+        <div className="stat-card">
+          <p className="stat-label">Other / walk-in sales</p>
+          <p className="stat-value">{formatMoney(data.other_sales || 0)}</p>
+        </div>
+        <div className="stat-card accent">
+          <p className="stat-label">Total income</p>
+          <p className="stat-value">
+            {formatMoney(data.income_total ?? data.sales_total)}
+          </p>
+        </div>
+        <div className="stat-card warn">
+          <p className="stat-label">Paid invoices</p>
+          <p className="stat-value">{data.paid_invoices || 0}</p>
         </div>
       </div>
 
@@ -79,7 +100,7 @@ export default function Dashboard() {
                 {data.recent_invoices.map((inv) => (
                   <tr key={inv.id}>
                     <td>
-                      <Link to={`/invoices/${inv.id}`}>{inv.invoice_number}</Link>
+                      <Link to={`/app/invoices/${inv.id}`}>{inv.invoice_number}</Link>
                     </td>
                     <td>{inv.customer_name}</td>
                     <td>{formatDate(inv.issue_date)}</td>
@@ -142,8 +163,10 @@ export default function Dashboard() {
       <section className="panel" style={{ marginTop: 18 }}>
         <div className="stats-grid" style={{ marginBottom: 0 }}>
           <div className="stat-card">
-            <p className="stat-label">All-time sales</p>
-            <p className="stat-value">{formatMoney(data.sales_total)}</p>
+            <p className="stat-label">All-time income</p>
+            <p className="stat-value">
+              {formatMoney(data.income_total ?? data.sales_total)}
+            </p>
           </div>
           <div className="stat-card">
             <p className="stat-label">All-time expenses</p>
@@ -158,6 +181,63 @@ export default function Dashboard() {
             <p className="stat-value">{data.total_invoices}</p>
           </div>
         </div>
+      </section>
+
+      <section className="panel" style={{ marginTop: 18 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end',
+            gap: 12,
+            marginBottom: 14,
+          }}
+        >
+          <div>
+            <h2 className="section-title" style={{ fontSize: '1.7rem' }}>
+              Inventory
+            </h2>
+            <p className="muted">
+              {data.inventory_items || 0} items · stock value{' '}
+              {formatMoney(data.stock_value || 0)}
+            </p>
+          </div>
+          <Link className="btn btn-ghost btn-sm" to="/app/inventory">
+            Open inventory
+          </Link>
+        </div>
+
+        <div className="stats-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <div className="stat-card accent">
+            <p className="stat-label">Stock value</p>
+            <p className="stat-value">{formatMoney(data.stock_value || 0)}</p>
+          </div>
+          <div className="stat-card warn">
+            <p className="stat-label">Low stock alerts</p>
+            <p className="stat-value">{data.low_stock_count || 0}</p>
+          </div>
+        </div>
+
+        {(data.low_stock_items || []).length === 0 ? (
+          <p className="empty">No low-stock items.</p>
+        ) : (
+          <div className="stack-list" style={{ marginTop: 12 }}>
+            {data.low_stock_items.map((item) => (
+              <div className="stack-item" key={item.id}>
+                <div>
+                  <strong>{item.name}</strong>
+                  <p className="muted">
+                    {item.sku || 'No SKU'} · reorder at {item.reorder_level}{' '}
+                    {item.unit}
+                  </p>
+                </div>
+                <strong>
+                  {item.quantity_on_hand} {item.unit}
+                </strong>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );
