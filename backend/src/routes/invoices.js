@@ -148,9 +148,14 @@ router.post('/', (req, res) => {
 
   const totals = calcTotals(items, tax_rate, discount);
   const invoiceNumber = nextInvoiceNumber(db);
-  const validStatus = ['draft', 'sent', 'paid', 'overdue', 'cancelled'].includes(
-    status
-  )
+  const validStatus = [
+    'draft',
+    'sent',
+    'paid',
+    'overdue',
+    'cancelled',
+    'credit_note',
+  ].includes(status)
     ? status
     : 'draft';
 
@@ -302,9 +307,14 @@ router.put('/:id', (req, res) => {
   }
 
   const totals = calcTotals(items, tax_rate, discount);
-  const validStatus = ['draft', 'sent', 'paid', 'overdue', 'cancelled'].includes(
-    status
-  )
+  const validStatus = [
+    'draft',
+    'sent',
+    'paid',
+    'overdue',
+    'cancelled',
+    'credit_note',
+  ].includes(status)
     ? status
     : existing.status;
 
@@ -394,11 +404,46 @@ router.put('/:id', (req, res) => {
 });
 
 router.delete('/:id', (req, res) => {
-  const result = db.prepare('DELETE FROM invoices WHERE id = ?').run(req.params.id);
-  if (result.changes === 0) {
+  const existing = db
+    .prepare('SELECT * FROM invoices WHERE id = ?')
+    .get(req.params.id);
+  if (!existing) {
     return res.status(404).json({ error: 'Invoice not found' });
   }
-  res.json({ success: true });
+  if (existing.status === 'credit_note') {
+    return res.status(400).json({
+      error: 'This invoice is already a credit note and cannot be removed',
+    });
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const creditNote = `Credit note issued on ${today} (original status: ${existing.status}).`;
+  const notes = existing.notes?.trim()
+    ? `${existing.notes.trim()}\n${creditNote}`
+    : creditNote;
+
+  const applyCredit = db.transaction(() => {
+    db.prepare(
+      `UPDATE invoices SET
+        status = 'credit_note',
+        notes = ?,
+        updated_at = datetime('now')
+       WHERE id = ?`
+    ).run(notes, req.params.id);
+
+    // Reverse any income that was booked when this invoice was paid
+    syncInvoiceSale({
+      invoiceId: Number(req.params.id),
+      invoiceNumber: existing.invoice_number,
+      issueDate: existing.issue_date,
+      status: 'credit_note',
+      total: existing.total,
+      notes,
+    });
+  });
+
+  applyCredit();
+  res.json(getInvoice(req.params.id));
 });
 
 export default router;

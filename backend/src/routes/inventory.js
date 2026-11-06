@@ -289,7 +289,18 @@ router.delete('/:id', (req, res) => {
   res.json({ success: true });
 });
 
-function applyMovement(itemId, { movement_type, quantity, unit_cost, reference, notes, movement_date, create_expense }) {
+function applyMovement(itemId, {
+  movement_type,
+  quantity,
+  unit_cost,
+  unit_price,
+  reference,
+  notes,
+  movement_date,
+  create_expense,
+  create_sale,
+  payment_method = 'cash',
+}) {
   const item = getItem(itemId);
   if (!item) {
     const err = new Error('Item not found');
@@ -345,6 +356,11 @@ function applyMovement(itemId, { movement_type, quantity, unit_cost, reference, 
       ? Number(unit_cost)
       : Number(item.cost_price) || 0;
 
+  const sellPrice =
+    unit_price !== undefined && unit_price !== null && unit_price !== ''
+      ? Number(unit_price)
+      : Number(item.sell_price) || 0;
+
   const date = movement_date || new Date().toISOString().slice(0, 10);
 
   const run = db.transaction(() => {
@@ -360,6 +376,10 @@ function applyMovement(itemId, { movement_type, quantity, unit_cost, reference, 
       ).run(cost, itemId);
     }
 
+    const moveRef =
+      reference?.trim() ||
+      (create_sale && type === 'out' ? 'Inventory sale' : null);
+
     const result = db
       .prepare(
         `INSERT INTO inventory_movements
@@ -372,7 +392,7 @@ function applyMovement(itemId, { movement_type, quantity, unit_cost, reference, 
         type === 'adjust' ? signedQty : qty,
         cost,
         nextQty,
-        reference?.trim() || null,
+        moveRef,
         notes?.trim() || null,
         date
       );
@@ -391,17 +411,52 @@ function applyMovement(itemId, { movement_type, quantity, unit_cost, reference, 
       );
     }
 
-    return result.lastInsertRowid;
+    let saleId = null;
+    if (create_sale && type === 'out' && qty > 0) {
+      if (sellPrice < 0 || Number.isNaN(sellPrice)) {
+        const err = new Error('Valid sell price is required');
+        err.status = 400;
+        throw err;
+      }
+      const amount = Math.round(qty * sellPrice * 100) / 100;
+      const saleResult = db
+        .prepare(
+          `INSERT INTO sales
+           (invoice_id, sale_date, description, category, amount, payment_method, notes)
+           VALUES (NULL, ?, ?, 'parts', ?, ?, ?)`
+        )
+        .run(
+          date,
+          `Inventory sale — ${item.name} × ${qty} ${item.unit}`,
+          amount,
+          payment_method || 'cash',
+          [
+            item.sku ? `SKU ${item.sku}` : null,
+            `@ AED ${sellPrice}`,
+            notes?.trim() || null,
+          ]
+            .filter(Boolean)
+            .join(' · ') || null
+        );
+      saleId = saleResult.lastInsertRowid;
+    }
+
+    return { movementId: result.lastInsertRowid, saleId };
   });
 
-  const movementId = run();
+  const { movementId, saleId } = run();
   const movement = db
     .prepare('SELECT * FROM inventory_movements WHERE id = ?')
     .get(movementId);
 
+  const sale = saleId
+    ? db.prepare('SELECT * FROM sales WHERE id = ?').get(saleId)
+    : null;
+
   return {
     item: enrichItem(getItem(itemId)),
     movement,
+    sale,
   };
 }
 

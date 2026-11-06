@@ -62,6 +62,10 @@ a {
   min-height: 100vh;
 }
 
+.app-shell.sidebar-collapsed {
+  grid-template-columns: 1fr;
+}
+
 .sidebar {
   position: sticky;
   top: 0;
@@ -75,10 +79,62 @@ a {
   gap: 28px;
 }
 
+.sidebar-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sidebar-close {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f3efe7;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.sidebar-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sidebar-open {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 40;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+.sidebar-open:hover {
+  background: var(--surface-2);
+}
+
+.app-shell.sidebar-collapsed .main {
+  padding-top: 64px;
+}
+
 .brand {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
 }
 
 .brand-mark {
@@ -364,6 +420,7 @@ tr:hover td {
 .badge.paid { background: var(--ok-bg); color: var(--ok); }
 .badge.overdue { background: var(--danger-bg); color: var(--danger); }
 .badge.cancelled { background: #ece8e0; color: var(--muted); }
+.badge.credit_note { background: #f3e8d8; color: #8a5a1a; }
 
 .row-actions {
   display: flex;
@@ -521,14 +578,33 @@ tr:hover td {
 .bar-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 
 .bar-row {
-  display: grid;
-  grid-template-columns: 100px 1fr 80px;
-  gap: 10px;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bar-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.bar-label {
+  text-transform: capitalize;
+  font-size: 0.92rem;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.bar-amount {
+  font-size: 0.92rem;
+  white-space: nowrap;
+  text-align: right;
 }
 
 .bar-track {
@@ -542,6 +618,78 @@ tr:hover td {
   height: 100%;
   background: linear-gradient(90deg, var(--accent), #e08a4f);
   border-radius: inherit;
+}
+
+.expense-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.expense-block + .expense-block {
+  margin-top: 0;
+}
+
+.expense-block-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 14px;
+}
+
+.expense-block-sub {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.expense-divider {
+  height: 1px;
+  background: rgba(31, 61, 47, 0.12);
+  margin: 22px 0;
+}
+
+.expense-item {
+  align-items: flex-start;
+}
+
+.expense-item-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.expense-item-title {
+  display: block;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.expense-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.expense-cat {
+  display: inline-flex;
+  align-items: center;
+  text-transform: capitalize;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(31, 61, 47, 0.08);
+  color: #1f3d2f;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.expense-item-amount {
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-align: right;
+  padding-top: 1px;
 }
 
 .checkbox-row {
@@ -684,6 +832,10 @@ tr:hover td {
 
   .main {
     padding: 20px 16px 40px;
+  }
+
+  .app-shell.sidebar-collapsed .main {
+    padding-top: 64px;
   }
 
   .stats-grid,

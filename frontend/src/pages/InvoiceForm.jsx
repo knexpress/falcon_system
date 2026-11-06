@@ -35,6 +35,7 @@ export default function InvoiceForm() {
   const [invoiceNumber, setInvoiceNumber] = useState('INV-····');
   const [form, setForm] = useState({
     customer_id: '',
+    customer_name: '',
     customer_trn: '',
     customer_phone: '',
     customer_address: '',
@@ -70,6 +71,7 @@ export default function InvoiceForm() {
         setInvoiceNumber(inv.invoice_number);
         setForm({
           customer_id: String(inv.customer_id),
+          customer_name: inv.customer_name || '',
           customer_trn: inv.customer_trn || '',
           customer_phone: inv.customer_phone || '',
           customer_address: inv.customer_address || '',
@@ -114,14 +116,58 @@ export default function InvoiceForm() {
   }
 
   function onCustomerChange(customerId) {
+    if (customerId === '__new__') {
+      setForm((prev) => ({
+        ...prev,
+        customer_id: '__new__',
+        customer_name: '',
+        customer_trn: '',
+        customer_phone: '',
+        customer_address: '',
+      }));
+      return;
+    }
+
     const customer = customers.find((c) => String(c.id) === String(customerId));
     setForm((prev) => ({
       ...prev,
       customer_id: customerId,
+      customer_name: customer?.name || '',
       customer_trn: customer?.trn || '',
       customer_phone: customer?.phone || '',
       customer_address: customer?.address || '',
     }));
+  }
+
+  async function ensureCustomerId() {
+    if (form.customer_id && form.customer_id !== '__new__') {
+      return Number(form.customer_id);
+    }
+
+    const name = form.customer_name.trim();
+    if (!name) {
+      throw new Error('Enter the new customer name.');
+    }
+
+    const created = await api.createCustomer({
+      name,
+      phone: form.customer_phone || null,
+      address: form.customer_address || null,
+      trn: form.customer_trn || null,
+    });
+
+    setCustomers((prev) =>
+      [...prev, created].sort((a, b) =>
+        String(a.name).localeCompare(String(b.name))
+      )
+    );
+    setForm((prev) => ({
+      ...prev,
+      customer_id: String(created.id),
+      customer_name: created.name,
+    }));
+
+    return created.id;
   }
 
   function updateItem(index, key, value) {
@@ -201,22 +247,23 @@ export default function InvoiceForm() {
     setSaving(true);
     setError('');
 
-    const payload = {
-      ...form,
-      customer_id: Number(form.customer_id),
-      tax_rate: Number(form.tax_rate) || 5,
-      discount: Number(form.discount) || 0,
-      items: form.items
-        .filter((item) => item.description.trim())
-        .map((item) => ({
-          ...item,
-          quantity: Number(item.quantity) || 0,
-          unit_price: Number(item.unit_price) || 0,
-          vat_rate: Number(item.vat_rate) || 0,
-        })),
-    };
-
     try {
+      const customerId = await ensureCustomerId();
+      const payload = {
+        ...form,
+        customer_id: customerId,
+        tax_rate: Number(form.tax_rate) || 5,
+        discount: Number(form.discount) || 0,
+        items: form.items
+          .filter((item) => item.description.trim())
+          .map((item) => ({
+            ...item,
+            quantity: Number(item.quantity) || 0,
+            unit_price: Number(item.unit_price) || 0,
+            vat_rate: Number(item.vat_rate) || 0,
+          })),
+      };
+
       const saved = isEdit
         ? await api.updateInvoice(id, payload)
         : await api.createInvoice(payload);
@@ -259,7 +306,7 @@ export default function InvoiceForm() {
           <h2 className="form-section-title">Customer details</h2>
           <div className="form-grid">
             <div className="field span-2">
-              <label>Customer Name *</label>
+              <label>Customer *</label>
               <select
                 className="select"
                 required
@@ -267,6 +314,7 @@ export default function InvoiceForm() {
                 onChange={(e) => onCustomerChange(e.target.value)}
               >
                 <option value="">Select customer</option>
+                <option value="__new__">+ Add new customer…</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -274,6 +322,21 @@ export default function InvoiceForm() {
                 ))}
               </select>
             </div>
+            {form.customer_id === '__new__' && (
+              <div className="field span-2">
+                <label>New customer name *</label>
+                <input
+                  className="input"
+                  required
+                  placeholder="Type customer name"
+                  value={form.customer_name}
+                  onChange={(e) => updateField('customer_name', e.target.value)}
+                />
+                <p className="muted" style={{ margin: '6px 0 0' }}>
+                  Saving this invoice will also save the customer in Customers.
+                </p>
+              </div>
+            )}
             <div className="field">
               <label>TRN / ID No.</label>
               <input
@@ -336,6 +399,7 @@ export default function InvoiceForm() {
                 <option value="paid">Paid</option>
                 <option value="overdue">Overdue</option>
                 <option value="cancelled">Cancelled</option>
+                <option value="credit_note">Credit note</option>
               </select>
             </div>
             <div className="field">

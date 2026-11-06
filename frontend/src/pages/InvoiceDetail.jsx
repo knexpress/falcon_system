@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import InvoiceDocument from '../components/InvoiceDocument.jsx';
 
 export default function InvoiceDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const [invoice, setInvoice] = useState(null);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
@@ -17,11 +16,17 @@ export default function InvoiceDetail() {
       .catch((err) => setError(err.message));
   }, [id]);
 
-  async function handleDelete() {
-    if (!window.confirm(`Delete ${invoice.invoice_number}?`)) return;
+  async function handleCreditNote() {
+    if (
+      !window.confirm(
+        `Issue credit note for ${invoice.invoice_number}? The invoice stays on file and any linked income is reversed.`
+      )
+    ) {
+      return;
+    }
     try {
-      await api.deleteInvoice(id);
-      navigate('/app/invoices');
+      const updated = await api.deleteInvoice(id);
+      setInvoice(updated);
     } catch (err) {
       setError(err.message);
     }
@@ -72,9 +77,11 @@ export default function InvoiceDetail() {
           <button className="btn btn-ghost" onClick={() => window.print()}>
             Print preview
           </button>
-          <button className="btn btn-danger" onClick={handleDelete}>
-            Delete
-          </button>
+          {invoice.status !== 'credit_note' && (
+            <button className="btn btn-danger" onClick={handleCreditNote}>
+              Credit note
+            </button>
+          )}
         </div>
       </header>
 

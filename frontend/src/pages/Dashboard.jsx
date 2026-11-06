@@ -115,47 +115,71 @@ export default function Dashboard() {
           )}
         </section>
 
-        <section className="panel">
-          <h2 className="section-title" style={{ fontSize: '1.7rem' }}>
-            Expense mix
-          </h2>
-          {data.expenses_by_category.length === 0 ? (
-            <p className="empty">No expenses recorded.</p>
-          ) : (
-            <div className="bar-list">
-              {data.expenses_by_category.map((row) => (
-                <div className="bar-row" key={row.category}>
-                  <span style={{ textTransform: 'capitalize' }}>{row.category}</span>
-                  <div className="bar-track">
-                    <div
-                      className="bar-fill"
-                      style={{ width: `${(row.total / maxExpense) * 100}%` }}
-                    />
-                  </div>
-                  <strong>{formatMoney(row.total)}</strong>
-                </div>
-              ))}
+        <section className="panel expense-panel">
+          <div className="expense-block">
+            <div className="expense-block-head">
+              <h2 className="section-title" style={{ fontSize: '1.45rem' }}>
+                Expense mix
+              </h2>
+              <p className="muted expense-block-sub">By category</p>
             </div>
-          )}
-
-          <h2
-            className="section-title"
-            style={{ fontSize: '1.7rem', marginTop: 24 }}
-          >
-            Recent expenses
-          </h2>
-          <div className="stack-list">
-            {data.recent_expenses.map((exp) => (
-              <div className="stack-item" key={exp.id}>
-                <div>
-                  <strong>{exp.description}</strong>
-                  <p className="muted">
-                    {formatDate(exp.expense_date)} · {exp.category}
-                  </p>
-                </div>
-                <strong>{formatMoney(exp.amount)}</strong>
+            {data.expenses_by_category.length === 0 ? (
+              <p className="empty">No expenses recorded.</p>
+            ) : (
+              <div className="bar-list">
+                {data.expenses_by_category.map((row) => (
+                  <div className="bar-row" key={row.category}>
+                    <div className="bar-meta">
+                      <span className="bar-label">{row.category}</span>
+                      <strong className="bar-amount">
+                        {formatMoney(row.total)}
+                      </strong>
+                    </div>
+                    <div className="bar-track">
+                      <div
+                        className="bar-fill"
+                        style={{
+                          width: `${(row.total / maxExpense) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+          </div>
+
+          <div className="expense-divider" />
+
+          <div className="expense-block">
+            <div className="expense-block-head">
+              <h2 className="section-title" style={{ fontSize: '1.45rem' }}>
+                Recent expenses
+              </h2>
+              <p className="muted expense-block-sub">Latest entries</p>
+            </div>
+            {data.recent_expenses.length === 0 ? (
+              <p className="empty">No recent expenses.</p>
+            ) : (
+              <div className="stack-list">
+                {data.recent_expenses.map((exp) => (
+                  <div className="stack-item expense-item" key={exp.id}>
+                    <div className="expense-item-main">
+                      <strong className="expense-item-title">
+                        {exp.description}
+                      </strong>
+                      <div className="expense-item-meta">
+                        <span>{formatDate(exp.expense_date)}</span>
+                        <span className="expense-cat">{exp.category}</span>
+                      </div>
+                    </div>
+                    <strong className="expense-item-amount">
+                      {formatMoney(exp.amount)}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </div>

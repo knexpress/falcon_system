@@ -28,11 +28,19 @@ export default function Invoices() {
     load();
   }, [status]);
 
-  async function handleDelete(id, number) {
-    if (!window.confirm(`Delete invoice ${number}?`)) return;
+  async function handleCreditNote(id, number) {
+    if (
+      !window.confirm(
+        `Issue credit note for ${number}? The invoice will stay on file (not deleted) and any linked income will be reversed.`
+      )
+    ) {
+      return;
+    }
     try {
-      await api.deleteInvoice(id);
-      setInvoices((prev) => prev.filter((i) => i.id !== id));
+      const updated = await api.deleteInvoice(id);
+      setInvoices((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, ...updated } : i))
+      );
     } catch (err) {
       setError(err.message);
     }
@@ -72,6 +80,7 @@ export default function Invoices() {
             <option value="paid">Paid</option>
             <option value="overdue">Overdue</option>
             <option value="cancelled">Cancelled</option>
+            <option value="credit_note">Credit note</option>
           </select>
           <button className="btn btn-ghost" onClick={load}>
             Search
@@ -111,7 +120,11 @@ export default function Invoices() {
                   </td>
                   <td>{formatDate(inv.issue_date)}</td>
                   <td>
-                    <span className={`badge ${inv.status}`}>{inv.status}</span>
+                    <span className={`badge ${inv.status}`}>
+                      {inv.status === 'credit_note'
+                        ? 'Credit note'
+                        : inv.status}
+                    </span>
                   </td>
                   <td>{formatMoney(inv.total)}</td>
                   <td>
@@ -119,12 +132,16 @@ export default function Invoices() {
                       <Link className="btn btn-ghost btn-sm" to={`/app/invoices/${inv.id}/edit`}>
                         Edit
                       </Link>
-                      <button
-                        className="btn btn-danger btn-sm"
-                        onClick={() => handleDelete(inv.id, inv.invoice_number)}
-                      >
-                        Delete
-                      </button>
+                      {inv.status !== 'credit_note' && (
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() =>
+                            handleCreditNote(inv.id, inv.invoice_number)
+                          }
+                        >
+                          Credit note
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
