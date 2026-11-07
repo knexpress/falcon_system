@@ -223,6 +223,44 @@ export async function initDb() {
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS backup_logs (
+      id SERIAL PRIMARY KEY,
+      backed_up_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      filename TEXT NOT NULL,
+      created_by TEXT,
+      invoice_count INTEGER NOT NULL DEFAULT 0,
+      customer_count INTEGER NOT NULL DEFAULT 0,
+      vehicle_count INTEGER NOT NULL DEFAULT 0,
+      sale_count INTEGER NOT NULL DEFAULT 0,
+      expense_count INTEGER NOT NULL DEFAULT 0,
+      inventory_count INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS error_logs (
+      id SERIAL PRIMARY KEY,
+      mark TEXT NOT NULL DEFAULT 'X Error',
+      source TEXT NOT NULL DEFAULT 'backend',
+      level TEXT NOT NULL DEFAULT 'error',
+      message TEXT NOT NULL,
+      stack TEXT,
+      name TEXT,
+      path TEXT,
+      method TEXT,
+      status_code INTEGER,
+      user_agent TEXT,
+      ip TEXT,
+      meta JSONB,
+      resolved_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_error_logs_created_at
+      ON error_logs (created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_error_logs_resolved_at
+      ON error_logs (resolved_at);
   `);
 
   await ensureColumn('customers', 'trn', 'TEXT');

@@ -66,11 +66,11 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-router.get('/:id/pdf', async (req, res) => {
-  const invoice = await getInvoice(req.params.id);
-  if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
-
+router.get('/:id/pdf', async (req, res, next) => {
   try {
+    const invoice = await getInvoice(req.params.id);
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+
     const pdf = await generateInvoicePdf(invoice);
     const filename = `${invoice.invoice_number || 'invoice'}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
@@ -80,8 +80,7 @@ router.get('/:id/pdf', async (req, res) => {
     );
     res.send(pdf);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message || 'Failed to generate PDF' });
+    next(err);
   }
 });
 

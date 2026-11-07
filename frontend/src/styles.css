@@ -222,6 +222,55 @@ a {
   color: var(--ink-soft);
 }
 
+.backup-panel {
+  border: 1px solid var(--line);
+}
+
+.backup-panel.backup-due {
+  border-color: rgba(183, 121, 31, 0.45);
+  background: linear-gradient(
+    180deg,
+    rgba(183, 121, 31, 0.08),
+    var(--surface)
+  );
+}
+
+.backup-row {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.backup-due-banner {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(183, 121, 31, 0.14);
+  color: #8a5a1a;
+  font-weight: 600;
+}
+
+.backup-ok {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.backup-login-notice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(183, 121, 31, 0.14);
+  border: 1px solid rgba(183, 121, 31, 0.35);
+  color: #6d4714;
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -424,6 +473,11 @@ tr:hover td {
 .badge.invoice { background: var(--info-bg); color: var(--info); }
 .badge.sale { background: var(--ok-bg); color: var(--ok); }
 .badge.expense { background: var(--danger-bg); color: var(--danger); }
+.badge.danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  text-transform: none;
+}
 
 tr.muted-row td {
   color: var(--muted);
@@ -505,6 +559,147 @@ table tfoot td {
   border-radius: 10px;
   padding: 12px 14px;
   margin-bottom: 14px;
+}
+
+.app-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(26, 28, 26, 0.42);
+  backdrop-filter: blur(3px);
+  animation: fade 0.15s ease;
+}
+
+.app-loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 220px;
+  padding: 14px 18px 16px;
+  border-radius: 18px;
+  background: rgba(247, 244, 238, 0.94);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.app-loading-car {
+  width: min(280px, 72vw);
+  height: 150px;
+}
+
+.app-loading-spinner {
+  width: 120px;
+  height: 120px;
+  margin-top: -6px;
+}
+
+.app-loading-label {
+  margin: 2px 0 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.http-notify-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 22, 20, 0.5);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 80;
+  animation: fade 0.2s ease;
+}
+
+.http-notify-dialog {
+  position: relative;
+  width: min(440px, 100%);
+  background: var(--surface);
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  padding: 22px;
+  padding-right: 108px;
+  animation: rise 0.25s ease;
+  overflow: hidden;
+}
+
+.http-notify-car {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  width: 96px;
+  height: 72px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.http-notify-dialog h2 {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+  font-weight: 400;
+  font-size: 1.7rem;
+}
+
+.http-notify-code {
+  display: inline-flex;
+  margin-bottom: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.http-notify-ok .http-notify-code {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.http-notify-info .http-notify-code {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.http-notify-danger .http-notify-code {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.http-notify-ok {
+  border-color: #b6d7c5;
+}
+
+.http-notify-info {
+  border-color: #b7cfe3;
+}
+
+.http-notify-danger {
+  border-color: #e7b6b6;
+}
+
+.http-notify-reason {
+  margin: 0 0 10px;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+.http-notify-detail {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  line-height: 1.4;
+}
+
+.http-notify-meta {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
 }
 
 .modal-backdrop {

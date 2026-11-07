@@ -9,7 +9,16 @@ import inventoryRouter from './routes/inventory.js';
 import vehiclesRouter from './routes/vehicles.js';
 import dashboardRouter from './routes/dashboard.js';
 import journalRouter from './routes/journal.js';
+import backupsRouter from './routes/backups.js';
+import errorsRouter from './routes/errors.js';
 import { initDb } from './db.js';
+import {
+  captureError,
+  captureErrorFromRequest,
+  installConsoleErrorHook,
+  installProcessErrorHandlers,
+} from './errorLogger.js';
+import { sendJson } from './httpStatus.js';
 import { ensureInvoiceSeries } from './ensureInvoiceSeries.js';
 import { backfillInvoiceIncome } from './syncInvoiceSale.js';
 import { syncCustomersAndVehiclesFromInvoices } from './syncFromInvoices.js';
@@ -40,9 +49,37 @@ app.use(
       return callback(null, false);
     },
     credentials: true,
+    exposedHeaders: [
+      'Content-Disposition',
+      'X-Falcon-Backup-Id',
+      'X-Falcon-Backup-At',
+    ],
   })
 );
 app.use(express.json());
+
+/** Simple per-IP rate limit → 429 Too Many Requests */
+const rateBuckets = new Map();
+const RATE_WINDOW_MS = 60_000;
+const RATE_MAX = 180;
+
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') return next();
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  const now = Date.now();
+  let bucket = rateBuckets.get(ip);
+  if (!bucket || now - bucket.startedAt > RATE_WINDOW_MS) {
+    bucket = { startedAt: now, count: 0 };
+    rateBuckets.set(ip, bucket);
+  }
+  bucket.count += 1;
+  if (bucket.count > RATE_MAX) {
+    return sendJson(res, 429, {
+      error: 'Too many requests from this client. Please wait and retry.',
+    });
+  }
+  return next();
+});
 
 app.get('/api/health', (_req, res) => {
   res.json({
@@ -63,16 +100,32 @@ app.use('/api/inventory', inventoryRouter);
 app.use('/api/vehicles', vehiclesRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/journal', journalRouter);
+app.use('/api/backups', backupsRouter);
+app.use('/api/errors', errorsRouter);
 
-app.use((err, _req, res, _next) => {
+// Unknown API route
+app.use('/api', (req, res) => {
+  sendJson(res, 404, {
+    error: `No API route for ${req.method} ${req.originalUrl}`,
+  });
+});
+
+app.use((err, req, res, _next) => {
+  const status = Number(err.status || err.statusCode) || 500;
+  if (status >= 500) {
+    void captureErrorFromRequest(err, req, { status_code: status });
+  }
   console.error(err);
-  res.status(500).json({
+  sendJson(res, status, {
     error: err.message || 'Internal server error',
+    mark: status >= 500 ? 'X Error' : undefined,
   });
 });
 
 async function start() {
   await initDb();
+  installConsoleErrorHook();
+  installProcessErrorHandlers();
 
   try {
     const renumbered = await ensureInvoiceSeries();
@@ -81,6 +134,10 @@ async function start() {
     }
   } catch (err) {
     console.error('Invoice series alignment failed:', err.message);
+    void captureError(err, {
+      source: 'backend',
+      meta: { via: 'ensureInvoiceSeries' },
+    });
   }
 
   try {
@@ -90,6 +147,10 @@ async function start() {
     }
   } catch (err) {
     console.error('Invoice income backfill failed:', err.message);
+    void captureError(err, {
+      source: 'backend',
+      meta: { via: 'backfillInvoiceIncome' },
+    });
   }
 
   try {
@@ -101,6 +162,10 @@ async function start() {
     }
   } catch (err) {
     console.error('Customer/vehicle sync from invoices failed:', err.message);
+    void captureError(err, {
+      source: 'backend',
+      meta: { via: 'syncCustomersAndVehiclesFromInvoices' },
+    });
   }
 
   app.listen(PORT, () => {
@@ -111,5 +176,8 @@ async function start() {
 
 start().catch((err) => {
   console.error('Failed to start server:', err);
-  process.exit(1);
+  void captureError(err, {
+    source: 'backend',
+    meta: { via: 'start' },
+  }).finally(() => process.exit(1));
 });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { api } from '../api.js';
 import { clearAuth, getAuth } from './RequireAuth.jsx';
 
 const nav = [
@@ -22,13 +23,54 @@ export default function AppShell() {
     const saved = localStorage.getItem(SIDEBAR_KEY);
     return saved === null ? true : saved === '1';
   });
+  const [pendingDays, setPendingDays] = useState(0);
+  const [showBackupNotice, setShowBackupNotice] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_KEY, sidebarOpen ? '1' : '0');
   }, [sidebarOpen]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    function refreshBackupNotice() {
+      api
+        .getBackupStatus()
+        .then((status) => {
+          if (cancelled) return;
+          const days = Number(status.pending_days) || 0;
+          setPendingDays(days);
+          if (days <= 0) {
+            sessionStorage.removeItem('falcon_backup_notice_dismissed');
+            setShowBackupNotice(false);
+            return;
+          }
+          const dismissed = sessionStorage.getItem(
+            'falcon_backup_notice_dismissed'
+          );
+          setShowBackupNotice(!dismissed);
+        })
+        .catch(() => {
+          if (!cancelled) setShowBackupNotice(false);
+        });
+    }
+
+    refreshBackupNotice();
+    window.addEventListener('falcon-backup-done', refreshBackupNotice);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('falcon-backup-done', refreshBackupNotice);
+    };
+  }, []);
+
+  function dismissBackupNotice() {
+    sessionStorage.setItem('falcon_backup_notice_dismissed', '1');
+    setShowBackupNotice(false);
+  }
+
   function logout() {
     clearAuth();
+    sessionStorage.removeItem('falcon_backup_notice_dismissed');
     navigate('/login');
   }
 
@@ -93,6 +135,30 @@ export default function AppShell() {
         </button>
       )}
       <main className="main">
+        {showBackupNotice && (
+          <div className="backup-login-notice">
+            <div>
+              Backup pending for{' '}
+              <strong>
+                {pendingDays} day{pendingDays === 1 ? '' : 's'}
+              </strong>
+              . Daily backup at 12:00 AM is important — download it from Invoices
+              when ready.
+            </div>
+            <div className="row-actions">
+              <Link className="btn btn-primary btn-sm" to="/app/invoices">
+                Go to Invoices
+              </Link>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={dismissBackupNotice}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

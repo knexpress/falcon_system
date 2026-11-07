@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, formatDate, formatMoney } from '../api.js';
+import { api, formatDate, formatDateTime, formatMoney } from '../api.js';
+import { getAuth } from '../components/RequireAuth.jsx';
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
@@ -8,7 +9,25 @@ export default function Invoices() {
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [downloadingId, setDownloadingId] = useState(null);
+  const [pdfBusyId, setPdfBusyId] = useState(null);
+  const [backupStatus, setBackupStatus] = useState(null);
+  const [backupLogs, setBackupLogs] = useState([]);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [showBackupHistory, setShowBackupHistory] = useState(false);
+
+  async function loadBackups() {
+    try {
+      const [statusData, logs] = await Promise.all([
+        api.getBackupStatus(),
+        api.getBackupLogs(),
+      ]);
+      setBackupStatus(statusData);
+      setBackupLogs(logs);
+    } catch (err) {
+      // Don't block invoices list if backup status fails
+      console.error(err);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -27,10 +46,23 @@ export default function Invoices() {
 
   useEffect(() => {
     load();
+    loadBackups();
   }, [status]);
 
+  async function handleViewPdf(inv) {
+    setPdfBusyId(inv.id);
+    setError('');
+    try {
+      await api.viewInvoicePdf(inv.id);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPdfBusyId(null);
+    }
+  }
+
   async function handleDownloadPdf(inv) {
-    setDownloadingId(inv.id);
+    setPdfBusyId(inv.id);
     setError('');
     try {
       await api.downloadInvoicePdf(
@@ -40,7 +72,7 @@ export default function Invoices() {
     } catch (err) {
       setError(err.message);
     } finally {
-      setDownloadingId(null);
+      setPdfBusyId(null);
     }
   }
 
@@ -62,6 +94,25 @@ export default function Invoices() {
     }
   }
 
+  async function handleDailyBackup() {
+    setBackupBusy(true);
+    setError('');
+    try {
+      const auth = getAuth();
+      const who = auth?.username || auth?.name || 'staff';
+      await api.downloadDailyBackup(who);
+      await loadBackups();
+      window.dispatchEvent(new Event('falcon-backup-done'));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
+  const lastBackupAt = backupStatus?.last_backup?.backed_up_at;
+  const todayDone = Boolean(backupStatus?.today_backup_done);
+
   return (
     <div>
       <header className="page-header">
@@ -69,10 +120,107 @@ export default function Invoices() {
           <h1>Invoices</h1>
           <p>Create, edit, and track customer job invoices.</p>
         </div>
-        <Link className="btn btn-primary" to="/app/invoices/new">
-          New invoice
-        </Link>
+        <div className="row-actions">
+          <button
+            className="btn btn-ghost"
+            disabled={backupBusy}
+            onClick={handleDailyBackup}
+            title="Download full workshop backup to this computer"
+          >
+            {backupBusy ? 'Backing up…' : 'Download daily backup'}
+          </button>
+          <Link className="btn btn-primary" to="/app/invoices/new">
+            New invoice
+          </Link>
+        </div>
       </header>
+
+      <section className={`panel backup-panel${todayDone ? '' : ' backup-due'}`}>
+        <div className="backup-row">
+          <div>
+            <h2 style={{ margin: '0 0 6px', fontSize: '1.05rem' }}>
+              Daily local backup
+            </h2>
+            <p className="muted" style={{ margin: 0 }}>
+              Important: take a backup every day at <strong>12:00 AM</strong>{' '}
+              (Asia/Dubai). File saves to this computer and the time is logged.
+            </p>
+            <p style={{ margin: '8px 0 0' }}>
+              {lastBackupAt ? (
+                <>
+                  Last backup:{' '}
+                  <strong>{formatDateTime(lastBackupAt)}</strong>
+                  {backupStatus?.last_backup?.created_by
+                    ? ` · by ${backupStatus.last_backup.created_by}`
+                    : ''}
+                  {backupStatus?.last_backup?.invoice_count != null
+                    ? ` · ${backupStatus.last_backup.invoice_count} invoices`
+                    : ''}
+                </>
+              ) : (
+                <strong>No backup recorded yet</strong>
+              )}
+            </p>
+          </div>
+          <div className="row-actions">
+            <button
+              className={`btn ${todayDone ? 'btn-ghost' : 'btn-primary'}`}
+              disabled={backupBusy}
+              onClick={handleDailyBackup}
+            >
+              {backupBusy
+                ? 'Preparing…'
+                : todayDone
+                  ? 'Download another backup'
+                  : 'Download today’s backup'}
+            </button>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => setShowBackupHistory((v) => !v)}
+            >
+              {showBackupHistory ? 'Hide history' : 'Backup history'}
+            </button>
+          </div>
+        </div>
+
+        {showBackupHistory && (
+          <div style={{ marginTop: 14 }}>
+            {backupLogs.length === 0 ? (
+              <p className="empty">No backup history yet.</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date &amp; time</th>
+                    <th>File</th>
+                    <th>By</th>
+                    <th>Invoices</th>
+                    <th>Customers</th>
+                    <th>Vehicles</th>
+                    <th>Sales</th>
+                    <th>Expenses</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {backupLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td>{formatDateTime(log.backed_up_at)}</td>
+                      <td>{log.filename}</td>
+                      <td>{log.created_by || '—'}</td>
+                      <td>{log.invoice_count}</td>
+                      <td>{log.customer_count}</td>
+                      <td>{log.vehicle_count}</td>
+                      <td>{log.sale_count}</td>
+                      <td>{log.expense_count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </section>
 
       <section className="panel">
         <div className="toolbar">
@@ -149,11 +297,18 @@ export default function Invoices() {
                         Edit
                       </Link>
                       <button
+                        className="btn btn-ghost btn-sm"
+                        disabled={pdfBusyId === inv.id}
+                        onClick={() => handleViewPdf(inv)}
+                      >
+                        {pdfBusyId === inv.id ? 'PDF…' : 'View PDF'}
+                      </button>
+                      <button
                         className="btn btn-primary btn-sm"
-                        disabled={downloadingId === inv.id}
+                        disabled={pdfBusyId === inv.id}
                         onClick={() => handleDownloadPdf(inv)}
                       >
-                        {downloadingId === inv.id ? 'PDF…' : 'Download PDF'}
+                        {pdfBusyId === inv.id ? 'PDF…' : 'Download PDF'}
                       </button>
                       {inv.status !== 'credit_note' && (
                         <button

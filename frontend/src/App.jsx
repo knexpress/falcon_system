@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AppShell from './components/AppShell.jsx';
+import HttpNotifyHost from './components/HttpNotifyHost.jsx';
+import LoadingOverlay from './components/LoadingOverlay.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
@@ -15,12 +17,18 @@ import JournalEntry from './pages/JournalEntry.jsx';
 import Inventory from './pages/Inventory.jsx';
 import Vehicles from './pages/Vehicles.jsx';
 import VehicleDetail from './pages/VehicleDetail.jsx';
+import Errors from './pages/Errors.jsx';
+import NotFound from './pages/NotFound.jsx';
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <LoadingOverlay />
+      <HttpNotifyHost />
+      <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/404" element={<NotFound />} />
 
       <Route
         path="/app"
@@ -43,9 +51,12 @@ export default function App() {
         <Route path="expenses" element={<Expenses />} />
         <Route path="journal" element={<Journal />} />
         <Route path="journal/:type/:id" element={<JournalEntry />} />
+        <Route path="errors" element={<Errors />} />
+        <Route path="*" element={<Navigate to="/404" replace />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
+    </>
   );
 }
