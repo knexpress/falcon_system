@@ -22,17 +22,19 @@ async function getVehicle(id) {
 router.get('/', async (req, res, next) => {
   try {
     const { q, customer_id } = req.query;
+    // Wrap so Postgres can ORDER BY computed aliases like last_visit
     let sql = `
-      SELECT v.*,
-             c.name AS customer_name,
-             c.phone AS customer_phone,
-             (SELECT COUNT(*)::int FROM invoices i WHERE i.vehicle_id = v.id) AS visit_count,
-             (SELECT COALESCE(SUM(total), 0)::float FROM invoices i WHERE i.vehicle_id = v.id) AS total_spent,
-             (SELECT COALESCE(SUM(total), 0)::float FROM invoices i WHERE i.vehicle_id = v.id AND i.status = 'paid') AS paid_spent,
-             (SELECT MAX(issue_date) FROM invoices i WHERE i.vehicle_id = v.id) AS last_visit
-      FROM vehicles v
-      LEFT JOIN customers c ON c.id = v.customer_id
-      WHERE 1=1
+      SELECT * FROM (
+        SELECT v.*,
+               c.name AS customer_name,
+               c.phone AS customer_phone,
+               (SELECT COUNT(*)::int FROM invoices i WHERE i.vehicle_id = v.id) AS visit_count,
+               (SELECT COALESCE(SUM(total), 0)::float FROM invoices i WHERE i.vehicle_id = v.id) AS total_spent,
+               (SELECT COALESCE(SUM(total), 0)::float FROM invoices i WHERE i.vehicle_id = v.id AND i.status = 'paid') AS paid_spent,
+               (SELECT MAX(issue_date) FROM invoices i WHERE i.vehicle_id = v.id) AS last_visit
+        FROM vehicles v
+        LEFT JOIN customers c ON c.id = v.customer_id
+        WHERE 1=1
     `;
     const params = [];
 
@@ -53,8 +55,12 @@ router.get('/', async (req, res, next) => {
       params.push(like, like, like, like, like);
     }
 
-    sql +=
-      ' ORDER BY CASE WHEN last_visit IS NULL THEN 1 ELSE 0 END, last_visit DESC, v.updated_at DESC, v.id DESC';
+    sql += `
+      ) vehicle_rows
+      ORDER BY CASE WHEN last_visit IS NULL THEN 1 ELSE 0 END,
+               last_visit DESC NULLS LAST,
+               updated_at DESC,
+               id DESC`;
     res.json(await all(sql, params));
   } catch (err) {
     next(err);

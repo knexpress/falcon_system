@@ -8,10 +8,11 @@ import expensesRouter from './routes/expenses.js';
 import inventoryRouter from './routes/inventory.js';
 import vehiclesRouter from './routes/vehicles.js';
 import dashboardRouter from './routes/dashboard.js';
+import journalRouter from './routes/journal.js';
 import { initDb } from './db.js';
 import { ensureInvoiceSeries } from './ensureInvoiceSeries.js';
 import { backfillInvoiceIncome } from './syncInvoiceSale.js';
-import { backfillVehiclesFromInvoices } from './vehicles.js';
+import { syncCustomersAndVehiclesFromInvoices } from './syncFromInvoices.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -61,10 +62,14 @@ app.use('/api/expenses', expensesRouter);
 app.use('/api/inventory', inventoryRouter);
 app.use('/api/vehicles', vehiclesRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/journal', journalRouter);
 
 app.use((err, _req, res, _next) => {
   console.error(err);
-  res.status(500).json({ error: 'Internal server error' });
+  res.status(500).json({
+    error: 'Internal server error',
+    detail: process.env.NODE_ENV === 'production' ? undefined : err.message,
+  });
 });
 
 async function start() {
@@ -89,12 +94,14 @@ async function start() {
   }
 
   try {
-    const vehiclesLinked = await backfillVehiclesFromInvoices();
-    if (vehiclesLinked > 0) {
-      console.log(`Backfilled ${vehiclesLinked} invoice(s) into vehicles.`);
+    const synced = await syncCustomersAndVehiclesFromInvoices();
+    if (synced.customersFixed > 0 || synced.vehiclesLinked > 0) {
+      console.log(
+        `Synced from invoices — customers fixed: ${synced.customersFixed}, vehicles linked: ${synced.vehiclesLinked}`
+      );
     }
   } catch (err) {
-    console.error('Vehicle backfill failed:', err.message);
+    console.error('Customer/vehicle sync from invoices failed:', err.message);
   }
 
   app.listen(PORT, () => {
