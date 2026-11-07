@@ -3,8 +3,10 @@ services:
     name: falcon-garage-api
     runtime: node
     rootDir: backend
-    buildCommand: npm install && python -m pip install -r requirements.txt
+    buildCommand: npm install && (python3 -m pip install -r requirements.txt || python -m pip install -r requirements.txt || python3 -m pip install --break-system-packages -r requirements.txt)
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
         value: "20"
+      - key: PYTHON_VERSION
+        value: "3.12"

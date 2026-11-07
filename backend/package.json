@@ -8,7 +8,8 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "seed": "node src/seed.js",
-    "seed:users": "node src/seedUsers.js"
+    "seed:users": "node src/seedUsers.js",
+    "postinstall": "node scripts/install-python-deps.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

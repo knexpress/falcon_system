@@ -43,10 +43,49 @@ async function runPython(args) {
   throw lastError || new Error('Python is not available on this server');
 }
 
+let pypdfReady = false;
+
+async function ensurePypdf() {
+  if (pypdfReady) return;
+  try {
+    await runPython(['-c', 'import pypdf']);
+    pypdfReady = true;
+    return;
+  } catch {
+    // Fall through and install
+  }
+
+  const req = path.join(__dirname, '..', 'requirements.txt');
+  const installAttempts = [
+    ['-m', 'pip', 'install', '-r', req],
+    ['-m', 'pip', 'install', '--break-system-packages', '-r', req],
+    ['-m', 'pip', 'install', 'pypdf'],
+    ['-m', 'pip', 'install', '--break-system-packages', 'pypdf'],
+  ];
+
+  let lastError;
+  for (const args of installAttempts) {
+    try {
+      await runPython(args);
+      await runPython(['-c', 'import pypdf']);
+      pypdfReady = true;
+      return;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw new Error(
+    `pypdf is not installed on this server. ${lastError?.message || ''}`.trim()
+  );
+}
+
 export async function generateInvoicePdf(invoice) {
   if (!fs.existsSync(GENERATOR) || !fs.existsSync(TEMPLATE)) {
     throw new Error('Invoice PDF template/generator is missing on the server');
   }
+
+  await ensurePypdf();
 
   const payload = invoiceToPayload(invoice);
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'falcon-inv-'));
