@@ -10,6 +10,7 @@ const nav = [
   { to: '/app/customers', label: 'Customers' },
   { to: '/app/sales', label: 'Sales' },
   { to: '/app/expenses', label: 'Expenses' },
+  { to: '/app/journal', label: 'Journal' },
 ];
 
 const SIDEBAR_KEY = 'falcon_sidebar_open';

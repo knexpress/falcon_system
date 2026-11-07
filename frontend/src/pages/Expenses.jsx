@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { api, formatDate, formatMoney, todayISO } from '../api.js';
 
 const emptyForm = {
@@ -12,6 +13,10 @@ const emptyForm = {
 };
 
 export default function Expenses() {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const journalReturn = location.state?.journalReturn;
+  const focusId = searchParams.get('focus');
   const [expenses, setExpenses] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
@@ -20,15 +25,22 @@ export default function Expenses() {
 
   async function load() {
     try {
-      setExpenses(await api.getExpenses());
+      const rows = await api.getExpenses();
+      setExpenses(rows);
+      return rows;
     } catch (err) {
       setError(err.message);
+      return [];
     }
   }
 
   useEffect(() => {
-    load();
-  }, []);
+    load().then((rows) => {
+      if (!focusId) return;
+      const match = rows.find((e) => String(e.id) === String(focusId));
+      if (match) openEdit(match);
+    });
+  }, [focusId]);
 
   const total = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
@@ -83,9 +95,16 @@ export default function Expenses() {
           <h1>Expenses</h1>
           <p>Track parts purchases, rent, utilities, and workshop costs.</p>
         </div>
-        <button className="btn btn-primary" onClick={openCreate}>
-          Add expense
-        </button>
+        <div className="row-actions">
+          {journalReturn && (
+            <Link className="btn btn-ghost" to={journalReturn}>
+              ← Back to journal
+            </Link>
+          )}
+          <button className="btn btn-primary" onClick={openCreate}>
+            Add expense
+          </button>
+        </div>
       </header>
 
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>

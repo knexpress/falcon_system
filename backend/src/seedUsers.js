@@ -1,9 +1,25 @@
 import bcrypt from 'bcryptjs';
-import { initDb, get, run } from './db.js';
+import { initDb, get, run, all } from './db.js';
 
 const USERS = [
-  { name: 'Mariel', username: 'mariel', password: 'Falcon@123', role: 'staff' },
-  { name: 'Arnie', username: 'arnie', password: 'Falcon@123', role: 'staff' },
+  {
+    name: 'Admin',
+    username: 'admin@falconrevive.ae',
+    password: 'falcon@123',
+    role: 'owner',
+  },
+  {
+    name: 'Mariel',
+    username: 'mariel@falconrevive.ae',
+    password: 'falcon@123',
+    role: 'staff',
+  },
+  {
+    name: 'Arnie',
+    username: 'arnie@falconrevive.ae',
+    password: 'falcon@123',
+    role: 'staff',
+  },
 ];
 
 async function upsertUser({ name, username, password, role }) {
@@ -33,10 +49,26 @@ async function upsertUser({ name, username, password, role }) {
 
 async function main() {
   await initDb();
+
   for (const user of USERS) {
     const result = await upsertUser(user);
     console.log(`${result.action}: ${result.username}`);
   }
+
+  // Keep only the email logins active; disable old short usernames if present
+  const keep = USERS.map((u) => u.username.toLowerCase());
+  const others = await all('SELECT id, username FROM users');
+  for (const row of others) {
+    if (!keep.includes(String(row.username).toLowerCase())) {
+      await run('UPDATE users SET is_active = 0 WHERE id = ?', [row.id]);
+      console.log(`deactivated: ${row.username}`);
+    }
+  }
+
+  const active = await all(
+    'SELECT id, name, username, role, is_active FROM users ORDER BY id'
+  );
+  console.log('users:', active);
   process.exit(0);
 }
 

@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import InvoiceDocument from '../components/InvoiceDocument.jsx';
 
 export default function InvoiceDetail() {
   const { id } = useParams();
+  const location = useLocation();
   const [invoice, setInvoice] = useState(null);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const journalReturn = location.state?.journalReturn;
+  const backTo = journalReturn || '/app/invoices';
+  const backLabel = journalReturn ? '← Back to journal' : 'Back';
 
   useEffect(() => {
     api
@@ -61,8 +65,8 @@ export default function InvoiceDetail() {
           </p>
         </div>
         <div className="row-actions">
-          <Link className="btn btn-ghost" to="/app/invoices">
-            Back
+          <Link className="btn btn-ghost" to={backTo}>
+            {backLabel}
           </Link>
           <Link className="btn btn-ghost" to={`/app/invoices/${id}/edit`}>
             Edit

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { api, formatDate, formatMoney, todayISO } from '../api.js';
 
 const emptyForm = {
@@ -20,6 +21,10 @@ const emptyInventorySale = {
 };
 
 export default function Sales() {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const journalReturn = location.state?.journalReturn;
+  const focusId = searchParams.get('focus');
   const [sales, setSales] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [form, setForm] = useState(emptyForm);
@@ -38,14 +43,20 @@ export default function Sales() {
       ]);
       setSales(salesRows);
       setInventory(items);
+      return salesRows;
     } catch (err) {
       setError(err.message);
+      return [];
     }
   }
 
   useEffect(() => {
-    load();
-  }, []);
+    load().then((rows) => {
+      if (!focusId) return;
+      const match = rows.find((s) => String(s.id) === String(focusId));
+      if (match && !match.invoice_id) openEdit(match);
+    });
+  }, [focusId]);
 
   const sellableItems = useMemo(
     () => inventory.filter((item) => Number(item.quantity_on_hand) > 0),
@@ -176,6 +187,11 @@ export default function Sales() {
           </p>
         </div>
         <div className="row-actions">
+          {journalReturn && (
+            <Link className="btn btn-ghost" to={journalReturn}>
+              ← Back to journal
+            </Link>
+          )}
           <button className="btn btn-ghost" onClick={openInventorySale}>
             Sell from inventory
           </button>

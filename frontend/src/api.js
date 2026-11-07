@@ -19,6 +19,11 @@ export const api = {
 
   getDashboard: () => request('/dashboard'),
 
+  getJournal: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/journal${qs ? `?${qs}` : ''}`);
+  },
+
   getCustomers: () => request('/customers'),
   createCustomer: (body) =>
     request('/customers', { method: 'POST', body: JSON.stringify(body) }),
@@ -57,6 +62,7 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return request(`/sales${qs ? `?${qs}` : ''}`);
   },
+  getSale: (id) => request(`/sales/${id}`),
   createSale: (body) =>
     request('/sales', { method: 'POST', body: JSON.stringify(body) }),
   updateSale: (id, body) =>
@@ -67,6 +73,7 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return request(`/expenses${qs ? `?${qs}` : ''}`);
   },
+  getExpense: (id) => request(`/expenses/${id}`),
   createExpense: (body) =>
     request('/expenses', { method: 'POST', body: JSON.stringify(body) }),
   updateExpense: (id, body) =>

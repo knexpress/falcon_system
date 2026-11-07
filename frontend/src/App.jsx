@@ -10,6 +10,8 @@ import InvoiceDetail from './pages/InvoiceDetail.jsx';
 import Customers from './pages/Customers.jsx';
 import Sales from './pages/Sales.jsx';
 import Expenses from './pages/Expenses.jsx';
+import Journal from './pages/Journal.jsx';
+import JournalEntry from './pages/JournalEntry.jsx';
 import Inventory from './pages/Inventory.jsx';
 import Vehicles from './pages/Vehicles.jsx';
 import VehicleDetail from './pages/VehicleDetail.jsx';
@@ -39,6 +41,8 @@ export default function App() {
         <Route path="customers" element={<Customers />} />
         <Route path="sales" element={<Sales />} />
         <Route path="expenses" element={<Expenses />} />
+        <Route path="journal" element={<Journal />} />
+        <Route path="journal/:type/:id" element={<JournalEntry />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

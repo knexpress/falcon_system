@@ -67,7 +67,7 @@ export default function Login() {
               onChange={(e) => setUsername(e.target.value)}
               required
               autoComplete="username"
-              placeholder="mariel or arnie"
+              placeholder="admin@falconrevive.ae"
             />
           </label>
           <label>

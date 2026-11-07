@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, todayISO } from '../api.js';
 import { InvoiceDocumentPreview } from '../components/InvoiceDocument.jsx';
 import {
@@ -27,6 +27,10 @@ export default function InvoiceForm() {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
+  const location = useLocation();
+  const journalReturn = location.state?.journalReturn;
+  const backTo = journalReturn || '/app/invoices';
+  const backLabel = journalReturn ? '← Back to journal' : 'Cancel';
 
   const [customers, setCustomers] = useState([]);
   const [error, setError] = useState('');
@@ -293,8 +297,8 @@ export default function InvoiceForm() {
           >
             {showPreview ? 'Hide preview' : 'Show preview'}
           </button>
-          <Link className="btn btn-ghost" to="/app/invoices">
-            Cancel
+          <Link className="btn btn-ghost" to={backTo}>
+            {backLabel}
           </Link>
         </div>
       </header>

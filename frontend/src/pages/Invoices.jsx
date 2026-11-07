@@ -8,6 +8,7 @@ export default function Invoices() {
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -27,6 +28,21 @@ export default function Invoices() {
   useEffect(() => {
     load();
   }, [status]);
+
+  async function handleDownloadPdf(inv) {
+    setDownloadingId(inv.id);
+    setError('');
+    try {
+      await api.downloadInvoicePdf(
+        inv.id,
+        `${inv.invoice_number || 'invoice'}.pdf`
+      );
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   async function handleCreditNote(id, number) {
     if (
@@ -132,6 +148,13 @@ export default function Invoices() {
                       <Link className="btn btn-ghost btn-sm" to={`/app/invoices/${inv.id}/edit`}>
                         Edit
                       </Link>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        disabled={downloadingId === inv.id}
+                        onClick={() => handleDownloadPdf(inv)}
+                      >
+                        {downloadingId === inv.id ? 'PDF…' : 'Download PDF'}
+                      </button>
                       {inv.status !== 'credit_note' && (
                         <button
                           className="btn btn-danger btn-sm"
