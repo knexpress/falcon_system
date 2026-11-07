@@ -9,7 +9,8 @@ import expensesRouter from './routes/expenses.js';
 import inventoryRouter from './routes/inventory.js';
 import vehiclesRouter from './routes/vehicles.js';
 import dashboardRouter from './routes/dashboard.js';
-import './db.js';
+import db from './db.js';
+import { ensureInvoiceSeries } from './utils.js';
 import { backfillInvoiceIncome } from './syncInvoiceSale.js';
 import { backfillVehiclesFromInvoices } from './vehicles.js';
 
@@ -18,6 +19,15 @@ const LOCAL_DB_PATH = path.join(__dirname, '..', 'data', 'garage.db');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+try {
+  const renumbered = ensureInvoiceSeries(db);
+  if (renumbered > 0) {
+    console.log(`Invoice series aligned from 00290 (${renumbered} invoice(s)).`);
+  }
+} catch (err) {
+  console.error('Invoice series alignment failed:', err.message);
+}
 
 try {
   const filled = backfillInvoiceIncome();
