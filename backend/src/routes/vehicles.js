@@ -57,10 +57,7 @@ router.get('/', async (req, res, next) => {
 
     sql += `
       ) vehicle_rows
-      ORDER BY CASE WHEN last_visit IS NULL THEN 1 ELSE 0 END,
-               last_visit DESC NULLS LAST,
-               updated_at DESC,
-               id DESC`;
+      ORDER BY last_visit DESC NULLS LAST, updated_at DESC, id DESC`;
     res.json(await all(sql, params));
   } catch (err) {
     next(err);

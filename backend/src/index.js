@@ -67,8 +67,7 @@ app.use('/api/journal', journalRouter);
 app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).json({
-    error: 'Internal server error',
-    detail: process.env.NODE_ENV === 'production' ? undefined : err.message,
+    error: err.message || 'Internal server error',
   });
 });
 
