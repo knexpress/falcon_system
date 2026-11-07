@@ -1,45 +1,42 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { api } from '../api.js';
 import { SITE_IMAGES } from '../data/siteImages.js';
 import './Login.css';
 
-const DEMO_USER = {
-  email: 'admin@falconrevive.ae',
-  password: 'Falcon@123',
-};
-
 export default function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState(DEMO_USER.email);
-  const [password, setPassword] = useState(DEMO_USER.password);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    window.setTimeout(() => {
-      if (
-        email.trim().toLowerCase() === DEMO_USER.email &&
-        password === DEMO_USER.password
-      ) {
-        localStorage.setItem(
-          'falcon_auth',
-          JSON.stringify({
-            email: DEMO_USER.email,
-            name: 'Workshop Admin',
-            role: 'owner',
-            at: Date.now(),
-          })
-        );
-        navigate('/app');
-      } else {
-        setError('Invalid email or password.');
-        setLoading(false);
-      }
-    }, 450);
+    try {
+      const user = await api.login({
+        username: username.trim(),
+        password,
+      });
+      localStorage.setItem(
+        'falcon_auth',
+        JSON.stringify({
+          id: user.id,
+          username: user.username,
+          email: user.username,
+          name: user.name,
+          role: user.role,
+          at: Date.now(),
+        })
+      );
+      navigate('/app');
+    } catch (err) {
+      setError(err.message || 'Invalid username or password.');
+      setLoading(false);
+    }
   }
 
   return (
@@ -63,13 +60,14 @@ export default function Login() {
         <form onSubmit={handleSubmit}>
           {error && <div className="login-error">{error}</div>}
           <label>
-            Email
+            Username
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
               autoComplete="username"
+              placeholder="mariel or arnie"
             />
           </label>
           <label>
@@ -86,10 +84,6 @@ export default function Login() {
             {loading ? 'Signing in…' : 'Enter ERP'}
           </button>
         </form>
-
-        <p className="login-hint">
-          Demo: <code>{DEMO_USER.email}</code> / <code>{DEMO_USER.password}</code>
-        </p>
       </main>
     </div>
   );

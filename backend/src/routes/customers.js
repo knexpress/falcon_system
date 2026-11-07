@@ -1,96 +1,117 @@
 import { Router } from 'express';
-import db from '../db.js';
+import { get, all, run } from '../db.js';
 
 const router = Router();
 
-router.get('/', (_req, res) => {
-  const customers = db
-    .prepare('SELECT * FROM customers ORDER BY name COLLATE NOCASE')
-    .all();
-  res.json(customers);
-});
-
-router.get('/:id', (req, res) => {
-  const customer = db
-    .prepare('SELECT * FROM customers WHERE id = ?')
-    .get(req.params.id);
-  if (!customer) return res.status(404).json({ error: 'Customer not found' });
-  res.json(customer);
-});
-
-router.post('/', (req, res) => {
-  const { name, email, phone, address, trn } = req.body;
-  if (!name?.trim()) {
-    return res.status(400).json({ error: 'Name is required' });
+router.get('/', async (_req, res, next) => {
+  try {
+    const customers = await all(
+      'SELECT * FROM customers ORDER BY LOWER(name)'
+    );
+    res.json(customers);
+  } catch (err) {
+    next(err);
   }
+});
 
-  const result = db
-    .prepare(
+router.get('/:id', async (req, res, next) => {
+  try {
+    const customer = await get('SELECT * FROM customers WHERE id = ?', [
+      req.params.id,
+    ]);
+    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+    res.json(customer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/', async (req, res, next) => {
+  try {
+    const { name, email, phone, address, trn } = req.body;
+    if (!name?.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    const result = await run(
       `INSERT INTO customers (name, email, phone, address, trn)
-       VALUES (?, ?, ?, ?, ?)`
-    )
-    .run(
-      name.trim(),
-      email?.trim() || null,
-      phone?.trim() || null,
-      address?.trim() || null,
-      trn?.trim() || null
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        name.trim(),
+        email?.trim() || null,
+        phone?.trim() || null,
+        address?.trim() || null,
+        trn?.trim() || null,
+      ]
     );
 
-  const customer = db
-    .prepare('SELECT * FROM customers WHERE id = ?')
-    .get(result.lastInsertRowid);
-  res.status(201).json(customer);
+    const customer = await get('SELECT * FROM customers WHERE id = ?', [
+      result.lastInsertRowid,
+    ]);
+    res.status(201).json(customer);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.put('/:id', (req, res) => {
-  const existing = db
-    .prepare('SELECT * FROM customers WHERE id = ?')
-    .get(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Customer not found' });
+router.put('/:id', async (req, res, next) => {
+  try {
+    const existing = await get('SELECT * FROM customers WHERE id = ?', [
+      req.params.id,
+    ]);
+    if (!existing) return res.status(404).json({ error: 'Customer not found' });
 
-  const { name, email, phone, address, trn } = req.body;
-  if (!name?.trim()) {
-    return res.status(400).json({ error: 'Name is required' });
+    const { name, email, phone, address, trn } = req.body;
+    if (!name?.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    await run(
+      `UPDATE customers
+       SET name = ?, email = ?, phone = ?, address = ?, trn = ?
+       WHERE id = ?`,
+      [
+        name.trim(),
+        email?.trim() || null,
+        phone?.trim() || null,
+        address?.trim() || null,
+        trn?.trim() || null,
+        req.params.id,
+      ]
+    );
+
+    const customer = await get('SELECT * FROM customers WHERE id = ?', [
+      req.params.id,
+    ]);
+    res.json(customer);
+  } catch (err) {
+    next(err);
   }
-
-  db.prepare(
-    `UPDATE customers
-     SET name = ?, email = ?, phone = ?, address = ?, trn = ?
-     WHERE id = ?`
-  ).run(
-    name.trim(),
-    email?.trim() || null,
-    phone?.trim() || null,
-    address?.trim() || null,
-    trn?.trim() || null,
-    req.params.id
-  );
-
-  const customer = db
-    .prepare('SELECT * FROM customers WHERE id = ?')
-    .get(req.params.id);
-  res.json(customer);
 });
 
-router.delete('/:id', (req, res) => {
-  const linked = db
-    .prepare('SELECT COUNT(*) AS count FROM invoices WHERE customer_id = ?')
-    .get(req.params.id);
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const linked = await get(
+      'SELECT COUNT(*)::int AS count FROM invoices WHERE customer_id = ?',
+      [req.params.id]
+    );
 
-  if (linked.count > 0) {
-    return res.status(400).json({
-      error: 'Cannot delete customer with existing invoices',
-    });
-  }
+    if (linked.count > 0) {
+      return res.status(400).json({
+        error: 'Cannot delete customer with existing invoices',
+      });
+    }
 
-  const result = db
-    .prepare('DELETE FROM customers WHERE id = ?')
-    .run(req.params.id);
-  if (result.changes === 0) {
-    return res.status(404).json({ error: 'Customer not found' });
+    const result = await run('DELETE FROM customers WHERE id = ?', [
+      req.params.id,
+    ]);
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
   }
-  res.json({ success: true });
 });
 
 export default router;

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import db from '../db.js';
+import { get, all, run, withTransaction } from '../db.js';
 
 const router = Router();
 
@@ -13,8 +13,8 @@ const CATEGORIES = [
   'other',
 ];
 
-function getItem(id) {
-  return db.prepare('SELECT * FROM inventory_items WHERE id = ?').get(id);
+async function getItem(id, client) {
+  return get('SELECT * FROM inventory_items WHERE id = ?', [id], client);
 }
 
 function enrichItem(item) {
@@ -28,280 +28,307 @@ function enrichItem(item) {
   };
 }
 
-router.get('/summary', (_req, res) => {
-  const summary = db
-    .prepare(
+router.get('/summary', async (_req, res, next) => {
+  try {
+    const summary = await get(
       `SELECT
-         COUNT(*) AS total_items,
-         SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_items,
-         SUM(CASE WHEN is_active = 1 AND quantity_on_hand <= reorder_level THEN 1 ELSE 0 END) AS low_stock_count,
-         COALESCE(SUM(CASE WHEN is_active = 1 THEN quantity_on_hand * cost_price ELSE 0 END), 0) AS stock_value
+         COUNT(*)::int AS total_items,
+         SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END)::int AS active_items,
+         SUM(CASE WHEN is_active = 1 AND quantity_on_hand <= reorder_level THEN 1 ELSE 0 END)::int AS low_stock_count,
+         COALESCE(SUM(CASE WHEN is_active = 1 THEN quantity_on_hand * cost_price ELSE 0 END), 0)::float AS stock_value
        FROM inventory_items`
-    )
-    .get();
+    );
 
-  const byCategory = db
-    .prepare(
-      `SELECT category, COUNT(*) AS count,
-              COALESCE(SUM(quantity_on_hand * cost_price), 0) AS value
+    const byCategory = await all(
+      `SELECT category, COUNT(*)::int AS count,
+              COALESCE(SUM(quantity_on_hand * cost_price), 0)::float AS value
        FROM inventory_items
        WHERE is_active = 1
        GROUP BY category
        ORDER BY value DESC`
-    )
-    .all();
+    );
 
-  const lowStock = db
-    .prepare(
-      `SELECT * FROM inventory_items
-       WHERE is_active = 1 AND quantity_on_hand <= reorder_level
-       ORDER BY quantity_on_hand ASC, name COLLATE NOCASE
-       LIMIT 10`
-    )
-    .all()
-    .map(enrichItem);
+    const lowStock = (
+      await all(
+        `SELECT * FROM inventory_items
+         WHERE is_active = 1 AND quantity_on_hand <= reorder_level
+         ORDER BY quantity_on_hand ASC, LOWER(name)
+         LIMIT 10`
+      )
+    ).map(enrichItem);
 
-  res.json({
-    ...summary,
-    stock_value: Math.round((summary.stock_value || 0) * 100) / 100,
-    by_category: byCategory,
-    low_stock: lowStock,
-  });
+    res.json({
+      ...summary,
+      stock_value: Math.round((summary.stock_value || 0) * 100) / 100,
+      by_category: byCategory,
+      low_stock: lowStock,
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get('/movements', (req, res) => {
-  const { item_id, type, from, to, limit = '100' } = req.query;
-  let sql = `
-    SELECT m.*, i.name AS item_name, i.sku AS item_sku, i.unit AS item_unit
-    FROM inventory_movements m
-    JOIN inventory_items i ON i.id = m.item_id
-    WHERE 1=1
-  `;
-  const params = [];
+router.get('/movements', async (req, res, next) => {
+  try {
+    const { item_id, type, from, to, limit = '100' } = req.query;
+    let sql = `
+      SELECT m.*, i.name AS item_name, i.sku AS item_sku, i.unit AS item_unit
+      FROM inventory_movements m
+      JOIN inventory_items i ON i.id = m.item_id
+      WHERE 1=1
+    `;
+    const params = [];
 
-  if (item_id) {
-    sql += ' AND m.item_id = ?';
-    params.push(item_id);
-  }
-  if (type) {
-    sql += ' AND m.movement_type = ?';
-    params.push(type);
-  }
-  if (from) {
-    sql += ' AND m.movement_date >= ?';
-    params.push(from);
-  }
-  if (to) {
-    sql += ' AND m.movement_date <= ?';
-    params.push(to);
-  }
+    if (item_id) {
+      sql += ' AND m.item_id = ?';
+      params.push(item_id);
+    }
+    if (type) {
+      sql += ' AND m.movement_type = ?';
+      params.push(type);
+    }
+    if (from) {
+      sql += ' AND m.movement_date >= ?';
+      params.push(from);
+    }
+    if (to) {
+      sql += ' AND m.movement_date <= ?';
+      params.push(to);
+    }
 
-  sql += ' ORDER BY m.movement_date DESC, m.id DESC LIMIT ?';
-  params.push(Math.min(Number(limit) || 100, 500));
+    sql += ' ORDER BY m.movement_date DESC, m.id DESC LIMIT ?';
+    params.push(Math.min(Number(limit) || 100, 500));
 
-  res.json(db.prepare(sql).all(...params));
+    res.json(await all(sql, params));
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get('/', (req, res) => {
-  const { q, category, low_stock, active = '1' } = req.query;
-  let sql = 'SELECT * FROM inventory_items WHERE 1=1';
-  const params = [];
+router.get('/', async (req, res, next) => {
+  try {
+    const { q, category, low_stock, active = '1' } = req.query;
+    let sql = 'SELECT * FROM inventory_items WHERE 1=1';
+    const params = [];
 
-  if (active === '1' || active === '0') {
-    sql += ' AND is_active = ?';
-    params.push(Number(active));
+    if (active === '1' || active === '0') {
+      sql += ' AND is_active = ?';
+      params.push(Number(active));
+    }
+
+    if (category) {
+      sql += ' AND category = ?';
+      params.push(category);
+    }
+
+    if (q) {
+      sql += ` AND (
+        name ILIKE ? OR sku ILIKE ? OR supplier ILIKE ? OR location ILIKE ?
+      )`;
+      const like = `%${q}%`;
+      params.push(like, like, like, like);
+    }
+
+    if (low_stock === '1') {
+      sql += ' AND quantity_on_hand <= reorder_level';
+    }
+
+    sql += ' ORDER BY LOWER(name)';
+    res.json((await all(sql, params)).map(enrichItem));
+  } catch (err) {
+    next(err);
   }
-
-  if (category) {
-    sql += ' AND category = ?';
-    params.push(category);
-  }
-
-  if (q) {
-    sql += ` AND (
-      name LIKE ? OR sku LIKE ? OR supplier LIKE ? OR location LIKE ?
-    )`;
-    const like = `%${q}%`;
-    params.push(like, like, like, like);
-  }
-
-  if (low_stock === '1') {
-    sql += ' AND quantity_on_hand <= reorder_level';
-  }
-
-  sql += ' ORDER BY name COLLATE NOCASE';
-  res.json(db.prepare(sql).all(...params).map(enrichItem));
 });
 
-router.get('/:id', (req, res) => {
-  const item = getItem(req.params.id);
-  if (!item) return res.status(404).json({ error: 'Item not found' });
+router.get('/:id', async (req, res, next) => {
+  try {
+    const item = await getItem(req.params.id);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
 
-  const movements = db
-    .prepare(
+    const movements = await all(
       `SELECT * FROM inventory_movements
        WHERE item_id = ?
        ORDER BY movement_date DESC, id DESC
-       LIMIT 50`
-    )
-    .all(req.params.id);
+       LIMIT 50`,
+      [req.params.id]
+    );
 
-  res.json({ ...enrichItem(item), movements });
+    res.json({ ...enrichItem(item), movements });
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.post('/', (req, res) => {
-  const {
-    sku,
-    name,
-    category = 'parts',
-    unit = 'Pcs',
-    quantity_on_hand = 0,
-    reorder_level = 0,
-    cost_price = 0,
-    sell_price = 0,
-    supplier,
-    location,
-    notes,
-    is_active = 1,
-  } = req.body;
-
-  if (!name?.trim()) {
-    return res.status(400).json({ error: 'Name is required' });
-  }
-
-  const qty = Math.max(0, Number(quantity_on_hand) || 0);
-  const cat = CATEGORIES.includes(category) ? category : 'other';
-
+router.post('/', async (req, res, next) => {
   try {
-    const create = db.transaction(() => {
-      const result = db
-        .prepare(
+    const {
+      sku,
+      name,
+      category = 'parts',
+      unit = 'Pcs',
+      quantity_on_hand = 0,
+      reorder_level = 0,
+      cost_price = 0,
+      sell_price = 0,
+      supplier,
+      location,
+      notes,
+      is_active = 1,
+    } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    const qty = Math.max(0, Number(quantity_on_hand) || 0);
+    const cat = CATEGORIES.includes(category) ? category : 'other';
+
+    try {
+      const itemId = await withTransaction(async (client) => {
+        const result = await run(
           `INSERT INTO inventory_items (
             sku, name, category, unit, quantity_on_hand, reorder_level,
             cost_price, sell_price, supplier, location, notes, is_active
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        )
-        .run(
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            sku?.trim() || null,
+            name.trim(),
+            cat,
+            unit.trim() || 'Pcs',
+            qty,
+            Math.max(0, Number(reorder_level) || 0),
+            Math.max(0, Number(cost_price) || 0),
+            Math.max(0, Number(sell_price) || 0),
+            supplier?.trim() || null,
+            location?.trim() || null,
+            notes?.trim() || null,
+            is_active ? 1 : 0,
+          ],
+          client
+        );
+
+        const id = result.lastInsertRowid;
+
+        if (qty > 0) {
+          await run(
+            `INSERT INTO inventory_movements
+             (item_id, movement_type, quantity, unit_cost, balance_after, reference, notes, movement_date)
+             VALUES (?, 'in', ?, ?, ?, ?, ?, CURRENT_DATE)`,
+            [
+              id,
+              qty,
+              Number(cost_price) || 0,
+              qty,
+              'Opening stock',
+              'Initial quantity on create',
+            ],
+            client
+          );
+        }
+
+        return id;
+      });
+
+      res.status(201).json(enrichItem(await getItem(itemId)));
+    } catch (err) {
+      if (String(err.message).includes('unique') || err.code === '23505') {
+        return res.status(400).json({ error: 'SKU already exists' });
+      }
+      throw err;
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/:id', async (req, res, next) => {
+  try {
+    const existing = await getItem(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Item not found' });
+
+    const {
+      sku,
+      name,
+      category = existing.category,
+      unit = existing.unit,
+      reorder_level = existing.reorder_level,
+      cost_price = existing.cost_price,
+      sell_price = existing.sell_price,
+      supplier,
+      location,
+      notes,
+      is_active = existing.is_active,
+    } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    const cat = CATEGORIES.includes(category) ? category : existing.category;
+
+    try {
+      await run(
+        `UPDATE inventory_items SET
+          sku = ?, name = ?, category = ?, unit = ?, reorder_level = ?,
+          cost_price = ?, sell_price = ?, supplier = ?, location = ?,
+          notes = ?, is_active = ?, updated_at = NOW()
+         WHERE id = ?`,
+        [
           sku?.trim() || null,
           name.trim(),
           cat,
           unit.trim() || 'Pcs',
-          qty,
           Math.max(0, Number(reorder_level) || 0),
           Math.max(0, Number(cost_price) || 0),
           Math.max(0, Number(sell_price) || 0),
           supplier?.trim() || null,
           location?.trim() || null,
           notes?.trim() || null,
-          is_active ? 1 : 0
-        );
-
-      const itemId = result.lastInsertRowid;
-
-      if (qty > 0) {
-        db.prepare(
-          `INSERT INTO inventory_movements
-           (item_id, movement_type, quantity, unit_cost, balance_after, reference, notes, movement_date)
-           VALUES (?, 'in', ?, ?, ?, ?, ?, date('now'))`
-        ).run(
-          itemId,
-          qty,
-          Number(cost_price) || 0,
-          qty,
-          'Opening stock',
-          'Initial quantity on create',
-        );
+          is_active ? 1 : 0,
+          req.params.id,
+        ]
+      );
+    } catch (err) {
+      if (String(err.message).includes('unique') || err.code === '23505') {
+        return res.status(400).json({ error: 'SKU already exists' });
       }
-
-      return itemId;
-    });
-
-    const itemId = create();
-    res.status(201).json(enrichItem(getItem(itemId)));
-  } catch (err) {
-    if (String(err.message).includes('UNIQUE')) {
-      return res.status(400).json({ error: 'SKU already exists' });
+      throw err;
     }
-    throw err;
+
+    res.json(enrichItem(await getItem(req.params.id)));
+  } catch (err) {
+    next(err);
   }
 });
 
-router.put('/:id', (req, res) => {
-  const existing = getItem(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Item not found' });
-
-  const {
-    sku,
-    name,
-    category = existing.category,
-    unit = existing.unit,
-    reorder_level = existing.reorder_level,
-    cost_price = existing.cost_price,
-    sell_price = existing.sell_price,
-    supplier,
-    location,
-    notes,
-    is_active = existing.is_active,
-  } = req.body;
-
-  if (!name?.trim()) {
-    return res.status(400).json({ error: 'Name is required' });
-  }
-
-  const cat = CATEGORIES.includes(category) ? category : existing.category;
-
+router.delete('/:id', async (req, res, next) => {
   try {
-    db.prepare(
-      `UPDATE inventory_items SET
-        sku = ?, name = ?, category = ?, unit = ?, reorder_level = ?,
-        cost_price = ?, sell_price = ?, supplier = ?, location = ?,
-        notes = ?, is_active = ?, updated_at = datetime('now')
-       WHERE id = ?`
-    ).run(
-      sku?.trim() || null,
-      name.trim(),
-      cat,
-      unit.trim() || 'Pcs',
-      Math.max(0, Number(reorder_level) || 0),
-      Math.max(0, Number(cost_price) || 0),
-      Math.max(0, Number(sell_price) || 0),
-      supplier?.trim() || null,
-      location?.trim() || null,
-      notes?.trim() || null,
-      is_active ? 1 : 0,
-      req.params.id
-    );
+    const existing = await getItem(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Item not found' });
+
+    await run('DELETE FROM inventory_items WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
   } catch (err) {
-    if (String(err.message).includes('UNIQUE')) {
-      return res.status(400).json({ error: 'SKU already exists' });
-    }
-    throw err;
+    next(err);
   }
-
-  res.json(enrichItem(getItem(req.params.id)));
 });
 
-router.delete('/:id', (req, res) => {
-  const existing = getItem(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Item not found' });
-
-  db.prepare('DELETE FROM inventory_items WHERE id = ?').run(req.params.id);
-  res.json({ success: true });
-});
-
-function applyMovement(itemId, {
-  movement_type,
-  quantity,
-  unit_cost,
-  unit_price,
-  reference,
-  notes,
-  movement_date,
-  create_expense,
-  create_sale,
-  payment_method = 'cash',
-}) {
-  const item = getItem(itemId);
+async function applyMovement(
+  itemId,
+  {
+    movement_type,
+    quantity,
+    unit_cost,
+    unit_price,
+    reference,
+    notes,
+    movement_date,
+    create_expense,
+    create_sale,
+    payment_method = 'cash',
+  }
+) {
+  const item = await getItem(itemId);
   if (!item) {
     const err = new Error('Item not found');
     err.status = 404;
@@ -340,7 +367,6 @@ function applyMovement(itemId, {
     nextQty -= qty;
     signedQty = -qty;
   } else {
-    // adjust: quantity is the new absolute balance
     const target = Number(quantity);
     if (Number.isNaN(target) || target < 0) {
       const err = new Error('Adjust quantity must be zero or greater');
@@ -363,30 +389,37 @@ function applyMovement(itemId, {
 
   const date = movement_date || new Date().toISOString().slice(0, 10);
 
-  const run = db.transaction(() => {
-    db.prepare(
+  const { movementId, saleId } = await withTransaction(async (client) => {
+    await run(
       `UPDATE inventory_items
-       SET quantity_on_hand = ?, updated_at = datetime('now')
-       WHERE id = ?`
-    ).run(nextQty, itemId);
+       SET quantity_on_hand = ?, updated_at = NOW()
+       WHERE id = ?`,
+      [nextQty, itemId],
+      client
+    );
 
-    if (type === 'in' && unit_cost !== undefined && unit_cost !== null && unit_cost !== '') {
-      db.prepare(
-        `UPDATE inventory_items SET cost_price = ? WHERE id = ?`
-      ).run(cost, itemId);
+    if (
+      type === 'in' &&
+      unit_cost !== undefined &&
+      unit_cost !== null &&
+      unit_cost !== ''
+    ) {
+      await run(
+        `UPDATE inventory_items SET cost_price = ? WHERE id = ?`,
+        [cost, itemId],
+        client
+      );
     }
 
     const moveRef =
       reference?.trim() ||
       (create_sale && type === 'out' ? 'Inventory sale' : null);
 
-    const result = db
-      .prepare(
-        `INSERT INTO inventory_movements
-         (item_id, movement_type, quantity, unit_cost, balance_after, reference, notes, movement_date)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(
+    const result = await run(
+      `INSERT INTO inventory_movements
+       (item_id, movement_type, quantity, unit_cost, balance_after, reference, notes, movement_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
         itemId,
         type,
         type === 'adjust' ? signedQty : qty,
@@ -394,24 +427,28 @@ function applyMovement(itemId, {
         nextQty,
         moveRef,
         notes?.trim() || null,
-        date
-      );
+        date,
+      ],
+      client
+    );
 
     if (create_expense && type === 'in' && qty > 0 && cost > 0) {
-      db.prepare(
+      await run(
         `INSERT INTO expenses
          (expense_date, description, category, amount, vendor, payment_method, notes)
-         VALUES (?, ?, 'parts', ?, ?, 'cash', ?)`
-      ).run(
-        date,
-        `Stock purchase — ${item.name}`,
-        Math.round(qty * cost * 100) / 100,
-        item.supplier || null,
-        reference || notes || null
+         VALUES (?, ?, 'parts', ?, ?, 'cash', ?)`,
+        [
+          date,
+          `Stock purchase — ${item.name}`,
+          Math.round(qty * cost * 100) / 100,
+          item.supplier || null,
+          reference || notes || null,
+        ],
+        client
       );
     }
 
-    let saleId = null;
+    let newSaleId = null;
     if (create_sale && type === 'out' && qty > 0) {
       if (sellPrice < 0 || Number.isNaN(sellPrice)) {
         const err = new Error('Valid sell price is required');
@@ -419,13 +456,11 @@ function applyMovement(itemId, {
         throw err;
       }
       const amount = Math.round(qty * sellPrice * 100) / 100;
-      const saleResult = db
-        .prepare(
-          `INSERT INTO sales
-           (invoice_id, sale_date, description, category, amount, payment_method, notes)
-           VALUES (NULL, ?, ?, 'parts', ?, ?, ?)`
-        )
-        .run(
+      const saleResult = await run(
+        `INSERT INTO sales
+         (invoice_id, sale_date, description, category, amount, payment_method, notes)
+         VALUES (NULL, ?, ?, 'parts', ?, ?, ?)`,
+        [
           date,
           `Inventory sale — ${item.name} × ${qty} ${item.unit}`,
           amount,
@@ -436,33 +471,35 @@ function applyMovement(itemId, {
             notes?.trim() || null,
           ]
             .filter(Boolean)
-            .join(' · ') || null
-        );
-      saleId = saleResult.lastInsertRowid;
+            .join(' · ') || null,
+        ],
+        client
+      );
+      newSaleId = saleResult.lastInsertRowid;
     }
 
-    return { movementId: result.lastInsertRowid, saleId };
+    return { movementId: result.lastInsertRowid, saleId: newSaleId };
   });
 
-  const { movementId, saleId } = run();
-  const movement = db
-    .prepare('SELECT * FROM inventory_movements WHERE id = ?')
-    .get(movementId);
+  const movement = await get(
+    'SELECT * FROM inventory_movements WHERE id = ?',
+    [movementId]
+  );
 
   const sale = saleId
-    ? db.prepare('SELECT * FROM sales WHERE id = ?').get(saleId)
+    ? await get('SELECT * FROM sales WHERE id = ?', [saleId])
     : null;
 
   return {
-    item: enrichItem(getItem(itemId)),
+    item: enrichItem(await getItem(itemId)),
     movement,
     sale,
   };
 }
 
-router.post('/:id/stock-in', (req, res) => {
+router.post('/:id/stock-in', async (req, res) => {
   try {
-    const result = applyMovement(req.params.id, {
+    const result = await applyMovement(req.params.id, {
       ...req.body,
       movement_type: 'in',
     });
@@ -472,9 +509,9 @@ router.post('/:id/stock-in', (req, res) => {
   }
 });
 
-router.post('/:id/stock-out', (req, res) => {
+router.post('/:id/stock-out', async (req, res) => {
   try {
-    const result = applyMovement(req.params.id, {
+    const result = await applyMovement(req.params.id, {
       ...req.body,
       movement_type: 'out',
     });
@@ -484,9 +521,9 @@ router.post('/:id/stock-out', (req, res) => {
   }
 });
 
-router.post('/:id/adjust', (req, res) => {
+router.post('/:id/adjust', async (req, res) => {
   try {
-    const result = applyMovement(req.params.id, {
+    const result = await applyMovement(req.params.id, {
       ...req.body,
       movement_type: 'adjust',
     });

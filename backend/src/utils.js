@@ -1,60 +1,28 @@
-/** Official workshop series starts at 00290 (5 digits). */
-const INVOICE_SERIES_START = 290;
-const INVOICE_NUMBER_WIDTH = 5;
+import { all } from './db.js';
 
-function formatInvoiceNumber(n) {
+/** Official invoice series starts at 00290 (5 digits). */
+export const INVOICE_SERIES_START = 290;
+export const INVOICE_NUMBER_WIDTH = 5;
+
+export function formatInvoiceNumber(n) {
   return String(n).padStart(INVOICE_NUMBER_WIDTH, '0');
 }
 
-function parseInvoiceNumber(value) {
+export function parseInvoiceNumber(value) {
   const match = String(value || '').match(/(\d+)\s*$/);
   if (!match) return null;
   const num = parseInt(match[1], 10);
   return Number.isNaN(num) ? null : num;
 }
 
-export function nextInvoiceNumber(db) {
-  const rows = db.prepare('SELECT invoice_number FROM invoices').all();
+export async function nextInvoiceNumber() {
+  const rows = await all('SELECT invoice_number FROM invoices');
   let max = INVOICE_SERIES_START - 1;
   for (const row of rows) {
     const n = parseInvoiceNumber(row.invoice_number);
     if (n !== null && n > max) max = n;
   }
   return formatInvoiceNumber(max + 1);
-}
-
-/** Align existing invoices onto 00290, 00291, ... */
-export function ensureInvoiceSeries(db) {
-  const invoices = db
-    .prepare('SELECT id, invoice_number FROM invoices ORDER BY id ASC')
-    .all();
-  if (invoices.length === 0) return 0;
-
-  const tx = db.transaction((rows) => {
-    for (const inv of rows) {
-      db.prepare('UPDATE invoices SET invoice_number = ? WHERE id = ?').run(
-        `__tmp_${inv.id}`,
-        inv.id
-      );
-    }
-    let n = INVOICE_SERIES_START;
-    for (const inv of rows) {
-      const number = formatInvoiceNumber(n);
-      db.prepare('UPDATE invoices SET invoice_number = ? WHERE id = ?').run(
-        number,
-        inv.id
-      );
-      db.prepare(
-        `UPDATE sales
-         SET description = ?
-         WHERE invoice_id = ? AND category = 'invoice'`
-      ).run(`Payment for ${number}`, inv.id);
-      n += 1;
-    }
-    return rows.length;
-  });
-
-  return tx(invoices);
 }
 
 export function calcTotals(items, taxRate = 5, discount = 0) {
@@ -98,7 +66,6 @@ export function calcTotals(items, taxRate = 5, discount = 0) {
   const discountAmt = Math.min(Math.max(Number(discount) || 0, 0), subtotal);
   const taxable = Math.round((subtotal - discountAmt) * 100) / 100;
 
-  // If discount applied, scale VAT proportionally to taxable base
   let taxAmount = Math.round(vatTotal * 100) / 100;
   if (subtotal > 0 && discountAmt > 0) {
     taxAmount = Math.round(taxable * (defaultVat / 100) * 100) / 100;

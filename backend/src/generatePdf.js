@@ -10,9 +10,9 @@ const PDF_DIR = path.join(__dirname, '..', 'invoice-pdf');
 const GENERATOR = path.join(PDF_DIR, 'invoice_generator.py');
 const TEMPLATE = path.join(PDF_DIR, 'Falcon_Revive_Emerald_Invoice_Fillable.pdf');
 
-function runPython(args) {
+function spawnPython(bin, args) {
   return new Promise((resolve, reject) => {
-    const child = spawn('python', args, { windowsHide: true });
+    const child = spawn(bin, args, { windowsHide: true });
     let stderr = '';
     child.stderr.on('data', (chunk) => {
       stderr += chunk.toString();
@@ -23,6 +23,24 @@ function runPython(args) {
       else reject(new Error(stderr || `PDF generator exited with code ${code}`));
     });
   });
+}
+
+async function runPython(args) {
+  const bins = process.platform === 'win32' ? ['python', 'py'] : ['python3', 'python'];
+  let lastError;
+  for (const bin of bins) {
+    try {
+      await spawnPython(bin, args);
+      return;
+    } catch (err) {
+      lastError = err;
+      // Try next binary if this one isn't installed
+      if (err.code === 'ENOENT') continue;
+      // Real Python/module error — stop and surface it
+      throw err;
+    }
+  }
+  throw lastError || new Error('Python is not available on this server');
 }
 
 export async function generateInvoicePdf(invoice) {

@@ -117,7 +117,7 @@ export default function InvoiceDocument({ invoice }) {
   );
 }
 
-export function InvoiceDocumentPreview({ form, customers, invoiceNumber = 'INV-····' }) {
+export function InvoiceDocumentPreview({ form, customers, invoiceNumber = '·····' }) {
   const customer = customers.find((c) => String(c.id) === String(form.customer_id));
 
   const items = (form.items || [])

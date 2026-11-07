@@ -32,7 +32,7 @@ export default function InvoiceForm() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
-  const [invoiceNumber, setInvoiceNumber] = useState('INV-····');
+  const [invoiceNumber, setInvoiceNumber] = useState('·····');
   const [form, setForm] = useState({
     customer_id: '',
     customer_name: '',

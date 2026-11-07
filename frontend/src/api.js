@@ -14,6 +14,9 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  login: (body) =>
+    request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+
   getDashboard: () => request('/dashboard'),
 
   getCustomers: () => request('/customers'),
