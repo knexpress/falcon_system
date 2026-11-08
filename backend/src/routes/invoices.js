@@ -1,11 +1,38 @@
 import { Router } from 'express';
 import { get, all, run, withTransaction } from '../db.js';
-import { calcTotals, nextInvoiceNumber } from '../utils.js';
+import {
+  calcTotals,
+  nextInvoiceNumber,
+  nextQuotationNumber,
+} from '../utils.js';
 import { generateInvoicePdf } from '../generatePdf.js';
 import { syncInvoiceSale } from '../syncInvoiceSale.js';
 import { upsertVehicleFromInvoice } from '../vehicles.js';
+import { getRequestUser, isOwner, isStaff } from '../requestUser.js';
 
 const router = Router();
+
+const BASE_STATUSES = [
+  'draft',
+  'sent',
+  'paid',
+  'overdue',
+  'cancelled',
+  'credit_note',
+  'debit_note',
+];
+
+const ALL_STATUSES = [
+  ...BASE_STATUSES,
+  'pending_approval',
+  'approved',
+  'changes_requested',
+  'rejected',
+];
+
+function normalizeRequestedStatus(status) {
+  return BASE_STATUSES.includes(status) ? status : 'sent';
+}
 
 async function getInvoice(id, client) {
   const invoice = await get(
@@ -32,7 +59,8 @@ async function getInvoice(id, client) {
 
 router.get('/', async (req, res, next) => {
   try {
-    const { status, q } = req.query;
+    const { status, q, doc_type: docTypeRaw } = req.query;
+    const docType = String(docTypeRaw || 'invoice').toLowerCase();
     let sql = `
       SELECT i.*, c.name AS customer_name
       FROM invoices i
@@ -40,6 +68,20 @@ router.get('/', async (req, res, next) => {
       WHERE 1=1
     `;
     const params = [];
+
+    if (docType === 'quotation') {
+      sql += ` AND i.doc_type = 'quotation'`;
+    } else if (docType === 'all') {
+      // no doc_type filter
+    } else if (docType === 'invoice_board') {
+      // Invoices page: real invoices + approved quotations ready to convert
+      sql += ` AND (
+        COALESCE(i.doc_type, 'invoice') = 'invoice'
+        OR (i.doc_type = 'quotation' AND i.status = 'approved')
+      )`;
+    } else {
+      sql += ` AND COALESCE(i.doc_type, 'invoice') = 'invoice'`;
+    }
 
     if (status) {
       sql += ' AND i.status = ?';
@@ -61,6 +103,28 @@ router.get('/', async (req, res, next) => {
 
     sql += ' ORDER BY i.issue_date DESC, i.id DESC';
     res.json(await all(sql, params));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/pending-approvals', async (req, res, next) => {
+  try {
+    const user = await getRequestUser(req);
+    if (!isOwner(user)) {
+      return res.status(403).json({
+        error: 'Only the owner can view the approvals queue.',
+      });
+    }
+
+    const rows = await all(
+      `SELECT i.*, c.name AS customer_name
+       FROM invoices i
+       JOIN customers c ON c.id = i.customer_id
+       WHERE i.doc_type = 'quotation' AND i.status = 'pending_approval'
+       ORDER BY i.created_at ASC, i.id ASC`
+    );
+    res.json(rows);
   } catch (err) {
     next(err);
   }
@@ -96,6 +160,7 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
+    const actor = await getRequestUser(req);
     const {
       customer_id,
       vehicle_make,
@@ -118,6 +183,7 @@ router.post('/', async (req, res, next) => {
       customer_trn,
       customer_phone,
       customer_address,
+      doc_type: bodyDocType,
     } = req.body;
 
     if (!customer_id) {
@@ -156,17 +222,26 @@ router.post('/', async (req, res, next) => {
     }
 
     const totals = calcTotals(items, tax_rate, discount);
-    const invoiceNumber = await nextInvoiceNumber();
-    const validStatus = [
-      'draft',
-      'sent',
-      'paid',
-      'overdue',
-      'cancelled',
-      'credit_note',
-    ].includes(status)
-      ? status
-      : 'draft';
+    // Staff always create quotations; owner may create invoice or quotation
+    const wantsQuotation =
+      String(bodyDocType || '').toLowerCase() === 'quotation' || isStaff(actor);
+    const docType = wantsQuotation ? 'quotation' : 'invoice';
+    const invoiceNumber = wantsQuotation
+      ? await nextQuotationNumber()
+      : await nextInvoiceNumber();
+    const requestedStatus = normalizeRequestedStatus(status);
+    const validStatus = wantsQuotation
+      ? 'pending_approval'
+      : ALL_STATUSES.includes(status)
+        ? status
+        : 'draft';
+    const journalStatus = wantsQuotation ? 'draft' : 'posted';
+    const createdBy =
+      actor?.username ||
+      String(req.headers['x-falcon-user'] || '').trim() ||
+      null;
+    const preparedName =
+      prepared_by || actor?.name || createdBy || null;
 
     const invoiceId = await withTransaction(async (client) => {
       const vehicleId = await upsertVehicleFromInvoice(
@@ -187,8 +262,9 @@ router.post('/', async (req, res, next) => {
           invoice_number, customer_id, vehicle_id, vehicle_make, vehicle_model, vehicle_year,
           vehicle_plate, vehicle_vin, job_order_no, mileage, issue_date, due_date,
           status, notes, prepared_by, authorized_by, received_by, labor_total,
-          parts_total, tax_rate, tax_amount, discount, subtotal, total
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          parts_total, tax_rate, tax_amount, discount, subtotal, total,
+          created_by, requested_status, doc_type, journal_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           invoiceNumber,
           customer_id,
@@ -204,7 +280,7 @@ router.post('/', async (req, res, next) => {
           due_date || null,
           validStatus,
           notes || null,
-          prepared_by || null,
+          preparedName,
           authorized_by || null,
           received_by || null,
           totals.laborTotal,
@@ -214,6 +290,10 @@ router.post('/', async (req, res, next) => {
           totals.discount,
           totals.subtotal,
           totals.total,
+          createdBy,
+          wantsQuotation ? requestedStatus : null,
+          docType,
+          journalStatus,
         ],
         client
       );
@@ -240,17 +320,19 @@ router.post('/', async (req, res, next) => {
         );
       }
 
-      await syncInvoiceSale(
-        {
-          invoiceId: id,
-          invoiceNumber,
-          issueDate: issue_date,
-          status: validStatus,
-          total: totals.total,
-          notes,
-        },
-        client
-      );
+      if (docType === 'invoice') {
+        await syncInvoiceSale(
+          {
+            invoiceId: id,
+            invoiceNumber,
+            issueDate: issue_date,
+            status: validStatus,
+            total: totals.total,
+            notes,
+          },
+          client
+        );
+      }
 
       return id;
     });
@@ -265,6 +347,7 @@ router.put('/:id', async (req, res, next) => {
   try {
     const existing = await getInvoice(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Invoice not found' });
+    const actor = await getRequestUser(req);
 
     const {
       customer_id,
@@ -326,16 +409,29 @@ router.put('/:id', async (req, res, next) => {
     }
 
     const totals = calcTotals(items, tax_rate, discount);
-    const validStatus = [
-      'draft',
-      'sent',
-      'paid',
-      'overdue',
-      'cancelled',
-      'credit_note',
-    ].includes(status)
+    const requestedStatus = normalizeRequestedStatus(
+      status || existing.requested_status || existing.status
+    );
+    const isQuote = existing.doc_type === 'quotation';
+    let validStatus = ALL_STATUSES.includes(status)
       ? status
       : existing.status;
+    let nextRequested = existing.requested_status || null;
+
+    if (isQuote) {
+      // Staff edits (including after send-back) re-submit to Cedrick
+      if (
+        isStaff(actor) ||
+        existing.status === 'pending_approval' ||
+        existing.status === 'changes_requested'
+      ) {
+        validStatus = 'pending_approval';
+        nextRequested = requestedStatus;
+      } else if (existing.status === 'approved' && isOwner(actor)) {
+        validStatus = 'approved';
+        nextRequested = requestedStatus;
+      }
+    }
 
     await withTransaction(async (client) => {
       const vehicleId = await upsertVehicleFromInvoice(
@@ -358,7 +454,7 @@ router.put('/:id', async (req, res, next) => {
           issue_date = ?, due_date = ?, status = ?, notes = ?, prepared_by = ?,
           authorized_by = ?, received_by = ?, labor_total = ?, parts_total = ?,
           tax_rate = ?, tax_amount = ?, discount = ?, subtotal = ?, total = ?,
-          updated_at = NOW()
+          requested_status = ?, updated_at = NOW()
          WHERE id = ?`,
         [
           customer_id,
@@ -384,6 +480,7 @@ router.put('/:id', async (req, res, next) => {
           totals.discount,
           totals.subtotal,
           totals.total,
+          nextRequested,
           req.params.id,
         ],
         client
@@ -432,6 +529,148 @@ router.put('/:id', async (req, res, next) => {
   }
 });
 
+router.post('/:id/approve', async (req, res, next) => {
+  try {
+    const actor = await getRequestUser(req);
+    if (!isOwner(actor)) {
+      return res.status(403).json({
+        error: 'Only Cedrick (owner) can approve quotations.',
+      });
+    }
+
+    const existing = await getInvoice(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Quotation not found' });
+    if (existing.doc_type !== 'quotation') {
+      return res.status(400).json({ error: 'Only quotations can be approved.' });
+    }
+    if (existing.status !== 'pending_approval') {
+      return res.status(400).json({
+        error: 'Only quotations waiting for approval can be approved.',
+      });
+    }
+
+    const note = String(req.body?.note || '').trim() || null;
+
+    await run(
+      `UPDATE invoices SET
+        status = 'approved',
+        approved_by = ?,
+        approved_at = NOW(),
+        approval_note = ?,
+        authorized_by = COALESCE(authorized_by, ?),
+        journal_status = 'draft',
+        updated_at = NOW()
+       WHERE id = ?`,
+      [actor.username, note, actor.name, req.params.id]
+    );
+
+    res.json(await getInvoice(req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id/send-back', async (req, res, next) => {
+  try {
+    const actor = await getRequestUser(req);
+    if (!isOwner(actor)) {
+      return res.status(403).json({
+        error: 'Only Cedrick (owner) can send quotations back.',
+      });
+    }
+
+    const existing = await getInvoice(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Quotation not found' });
+    if (existing.doc_type !== 'quotation') {
+      return res
+        .status(400)
+        .json({ error: 'Only quotations can be sent back.' });
+    }
+    if (existing.status !== 'pending_approval') {
+      return res.status(400).json({
+        error: 'Only quotations waiting for approval can be sent back.',
+      });
+    }
+
+    const note = String(req.body?.note || '').trim();
+    if (!note) {
+      return res.status(400).json({
+        error: 'A note is required so Mariel / Arnie know what to change.',
+      });
+    }
+
+    await run(
+      `UPDATE invoices SET
+        status = 'changes_requested',
+        approved_by = ?,
+        approved_at = NOW(),
+        approval_note = ?,
+        journal_status = 'draft',
+        updated_at = NOW()
+       WHERE id = ?`,
+      [actor.username, note, req.params.id]
+    );
+
+    res.json(await getInvoice(req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id/generate-invoice', async (req, res, next) => {
+  try {
+    const actor = await getRequestUser(req);
+    const existing = await getInvoice(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Quotation not found' });
+    if (existing.doc_type !== 'quotation' || existing.status !== 'approved') {
+      return res.status(400).json({
+        error: 'Only Cedrick-approved quotations can generate an invoice.',
+      });
+    }
+
+    const nextStatus = normalizeRequestedStatus(
+      req.body?.status || existing.requested_status || 'sent'
+    );
+    const invoiceNumber = await nextInvoiceNumber();
+
+    await withTransaction(async (client) => {
+      await run(
+        `UPDATE invoices SET
+          doc_type = 'invoice',
+          invoice_number = ?,
+          status = ?,
+          journal_status = 'posted',
+          authorized_by = COALESCE(authorized_by, ?),
+          updated_at = NOW()
+         WHERE id = ?`,
+        [
+          invoiceNumber,
+          nextStatus,
+          actor?.name || existing.authorized_by || null,
+          req.params.id,
+        ],
+        client
+      );
+
+      await syncInvoiceSale(
+        {
+          invoiceId: Number(req.params.id),
+          invoiceNumber,
+          issueDate: existing.issue_date,
+          status: nextStatus,
+          total: existing.total,
+          notes: existing.notes,
+        },
+        client
+      );
+    });
+
+    res.json(await getInvoice(req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.delete('/:id', async (req, res, next) => {
   try {
     const existing = await get('SELECT * FROM invoices WHERE id = ?', [
@@ -439,6 +678,11 @@ router.delete('/:id', async (req, res, next) => {
     ]);
     if (!existing) {
       return res.status(404).json({ error: 'Invoice not found' });
+    }
+    if (existing.doc_type === 'quotation') {
+      return res.status(400).json({
+        error: 'Quotations cannot be converted to a credit note.',
+      });
     }
     if (existing.status === 'credit_note') {
       return res.status(400).json({
@@ -457,6 +701,7 @@ router.delete('/:id', async (req, res, next) => {
         `UPDATE invoices SET
           status = 'credit_note',
           notes = ?,
+          journal_status = 'posted',
           updated_at = NOW()
          WHERE id = ?`,
         [notes, req.params.id],
@@ -469,6 +714,67 @@ router.delete('/:id', async (req, res, next) => {
           invoiceNumber: existing.invoice_number,
           issueDate: existing.issue_date,
           status: 'credit_note',
+          total: existing.total,
+          notes,
+        },
+        client
+      );
+    });
+
+    res.json(await getInvoice(req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id/debit-note', async (req, res, next) => {
+  try {
+    const existing = await get('SELECT * FROM invoices WHERE id = ?', [
+      req.params.id,
+    ]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    if (existing.doc_type === 'quotation') {
+      return res.status(400).json({
+        error: 'Quotations cannot be converted to a debit note.',
+      });
+    }
+    if (existing.status === 'debit_note') {
+      return res.status(400).json({
+        error: 'This invoice is already a debit note.',
+      });
+    }
+    if (existing.status === 'credit_note') {
+      return res.status(400).json({
+        error: 'A credit note cannot be converted to a debit note.',
+      });
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const debitNote = `Debit note issued on ${today} (original status: ${existing.status}).`;
+    const notes = existing.notes?.trim()
+      ? `${existing.notes.trim()}\n${debitNote}`
+      : debitNote;
+
+    await withTransaction(async (client) => {
+      await run(
+        `UPDATE invoices SET
+          status = 'debit_note',
+          notes = ?,
+          journal_status = 'posted',
+          updated_at = NOW()
+         WHERE id = ?`,
+        [notes, req.params.id],
+        client
+      );
+
+      await syncInvoiceSale(
+        {
+          invoiceId: Number(req.params.id),
+          invoiceNumber: existing.invoice_number,
+          issueDate: existing.issue_date,
+          status: 'debit_note',
           total: existing.total,
           notes,
         },

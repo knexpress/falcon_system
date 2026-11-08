@@ -4,6 +4,20 @@ import { notify } from './notify.js';
 
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
+function authHeaders() {
+  try {
+    const auth = JSON.parse(localStorage.getItem('falcon_auth') || 'null');
+    if (!auth?.username) return {};
+    return {
+      'X-Falcon-User': auth.username,
+      'X-Falcon-Name': auth.name || '',
+      'X-Falcon-Role': auth.role || '',
+    };
+  } catch {
+    return {};
+  }
+}
+
 async function parseBody(res) {
   if (res.status === 204) return {};
   const text = await res.text();
@@ -73,6 +87,7 @@ async function request(path, options = {}) {
         ...rest,
         headers: {
           'Content-Type': 'application/json',
+          ...authHeaders(),
           ...(extraHeaders || {}),
         },
       });
@@ -175,6 +190,13 @@ export const api = {
       body: JSON.stringify(body),
       successMessage: 'Signed in successfully.',
     }),
+  getProfile: () => request('/auth/me', { silent: true }),
+  updateProfile: (body) =>
+    request('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+      successMessage: 'Profile updated.',
+    }),
 
   getDashboard: () => request('/dashboard', { silent: true }),
 
@@ -206,23 +228,59 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return request(`/invoices${qs ? `?${qs}` : ''}`, { silent: true });
   },
+  getQuotations: (params = {}) => {
+    const qs = new URLSearchParams({ ...params, doc_type: 'quotation' }).toString();
+    return request(`/invoices?${qs}`, { silent: true });
+  },
   getInvoice: (id) => request(`/invoices/${id}`, { silent: true }),
   createInvoice: (body) =>
     request('/invoices', {
       method: 'POST',
       body: JSON.stringify(body),
-      successMessage: 'Invoice created.',
+      successMessage:
+        body?.doc_type === 'quotation'
+          ? 'Quotation submitted for Cedrick’s approval.'
+          : 'Invoice created.',
     }),
   updateInvoice: (id, body) =>
     request(`/invoices/${id}`, {
       method: 'PUT',
       body: JSON.stringify(body),
-      successMessage: 'Invoice updated.',
+      successMessage:
+        body?.doc_type === 'quotation'
+          ? 'Quotation updated.'
+          : 'Invoice updated.',
     }),
   deleteInvoice: (id) =>
     request(`/invoices/${id}`, {
       method: 'DELETE',
       successMessage: 'Credit note issued / invoice cancelled.',
+    }),
+  issueDebitNote: (id) =>
+    request(`/invoices/${id}/debit-note`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+      successMessage: 'Debit note issued — amount posted as income.',
+    }),
+  getPendingApprovals: () =>
+    request('/invoices/pending-approvals', { silent: true }),
+  approveInvoice: (id, body = {}) =>
+    request(`/invoices/${id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      successMessage: 'Quotation approved — ready to generate invoice.',
+    }),
+  sendBackQuotation: (id, body = {}) =>
+    request(`/invoices/${id}/send-back`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      successMessage: 'Quotation sent back for changes.',
+    }),
+  generateInvoiceFromQuotation: (id, body = {}) =>
+    request(`/invoices/${id}/generate-invoice`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      successMessage: 'Invoice generated and journal entry posted.',
     }),
   async fetchInvoicePdfBlob(id) {
     const apiPath = `/api/invoices/${id}/pdf`;

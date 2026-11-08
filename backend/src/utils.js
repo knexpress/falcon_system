@@ -16,13 +16,29 @@ export function parseInvoiceNumber(value) {
 }
 
 export async function nextInvoiceNumber() {
-  const rows = await all('SELECT invoice_number FROM invoices');
+  const rows = await all(
+    `SELECT invoice_number FROM invoices
+     WHERE COALESCE(doc_type, 'invoice') = 'invoice'`
+  );
   let max = INVOICE_SERIES_START - 1;
   for (const row of rows) {
     const n = parseInvoiceNumber(row.invoice_number);
     if (n !== null && n > max) max = n;
   }
   return formatInvoiceNumber(max + 1);
+}
+
+/** Quotation series: QT-00001, QT-00002, … */
+export async function nextQuotationNumber() {
+  const rows = await all(
+    `SELECT invoice_number FROM invoices WHERE doc_type = 'quotation'`
+  );
+  let max = 0;
+  for (const row of rows) {
+    const n = parseInvoiceNumber(row.invoice_number);
+    if (n !== null && n > max) max = n;
+  }
+  return `QT-${String(max + 1).padStart(5, '0')}`;
 }
 
 export function calcTotals(items, taxRate = 5, discount = 0) {

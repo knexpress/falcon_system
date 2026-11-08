@@ -12,6 +12,7 @@ router.get('/', async (_req, res, next) => {
          SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END)::int AS sent_invoices,
          SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END)::int AS overdue_invoices,
          SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END)::int AS draft_invoices,
+         SUM(CASE WHEN status = 'pending_approval' AND doc_type = 'quotation' THEN 1 ELSE 0 END)::int AS pending_approvals,
          COALESCE(SUM(CASE WHEN status = 'paid' THEN total ELSE 0 END), 0)::float AS paid_amount,
          COALESCE(SUM(CASE WHEN status IN ('sent', 'overdue') THEN total ELSE 0 END), 0)::float AS outstanding_amount
        FROM invoices`

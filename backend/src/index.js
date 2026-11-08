@@ -56,7 +56,7 @@ app.use(
     ],
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 /** Simple per-IP rate limit → 429 Too Many Requests */
 const rateBuckets = new Map();
@@ -81,12 +81,35 @@ app.use('/api', (req, res, next) => {
   return next();
 });
 
+function describeDatabase() {
+  const url = process.env.DATABASE_URL || '';
+  const local =
+    process.env.DATABASE_SSL === 'false' ||
+    /@(localhost|127\.0\.0\.1)(:|\/)/i.test(url);
+  let host = 'unknown';
+  try {
+    host = new URL(url.replace(/^postgresql:/i, 'http:')).hostname;
+  } catch {
+    // ignore parse errors
+  }
+  return {
+    local,
+    host,
+    label: local
+      ? `Local Docker Postgres (${host})`
+      : `Cloud Postgres (${host})`,
+  };
+}
+
 app.get('/api/health', (_req, res) => {
+  const db = describeDatabase();
   res.json({
     ok: true,
     service: 'garage-finance-api',
     database: 'postgres',
-    persistence: 'Cloud database via DATABASE_URL',
+    persistence: db.label,
+    database_host: db.host,
+    local_dev: db.local,
     cors_origin: corsOrigin,
   });
 });
@@ -169,8 +192,9 @@ async function start() {
   }
 
   app.listen(PORT, () => {
+    const db = describeDatabase();
     console.log(`Garage Finance API running on http://localhost:${PORT}`);
-    console.log('Using cloud Postgres (DATABASE_URL)');
+    console.log(`Using ${db.label}`);
   });
 }
 

@@ -5,6 +5,8 @@ import LoadingOverlay from './components/LoadingOverlay.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
+import PrivacyPolicy from './pages/PrivacyPolicy.jsx';
+import Terms from './pages/Terms.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Invoices from './pages/Invoices.jsx';
 import InvoiceForm from './pages/InvoiceForm.jsx';
@@ -18,6 +20,8 @@ import Inventory from './pages/Inventory.jsx';
 import Vehicles from './pages/Vehicles.jsx';
 import VehicleDetail from './pages/VehicleDetail.jsx';
 import Errors from './pages/Errors.jsx';
+import Approvals from './pages/Approvals.jsx';
+import Quotations from './pages/Quotations.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 export default function App() {
@@ -28,6 +32,8 @@ export default function App() {
       <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<Terms />} />
       <Route path="/404" element={<NotFound />} />
 
       <Route
@@ -39,6 +45,17 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="approvals" element={<Approvals />} />
+        <Route path="quotations" element={<Quotations />} />
+        <Route
+          path="quotations/new"
+          element={<InvoiceForm forceDocType="quotation" />}
+        />
+        <Route path="quotations/:id" element={<InvoiceDetail />} />
+        <Route
+          path="quotations/:id/edit"
+          element={<InvoiceForm forceDocType="quotation" />}
+        />
         <Route path="invoices" element={<Invoices />} />
         <Route path="invoices/new" element={<InvoiceForm />} />
         <Route path="invoices/:id" element={<InvoiceDetail />} />

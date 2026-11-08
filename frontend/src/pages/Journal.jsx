@@ -3,8 +3,10 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, formatDate, formatMoney } from '../api.js';
 
 const TYPE_LABELS = {
+  quotation: 'Quotation',
   invoice: 'Invoice',
   credit_note: 'Credit note',
+  debit_note: 'Debit note',
   sale: 'Sale',
   expense: 'Expense',
 };
@@ -75,8 +77,8 @@ export default function Journal() {
         <div>
           <h1>Journal</h1>
           <p>
-            All invoices, credit notes, sales, and expenses in one tally —
-            click any row to drill down, then return here.
+            All invoices, credit notes, debit notes, sales, and expenses in one
+            tally — click any row to drill down, then return here.
           </p>
         </div>
       </header>
@@ -127,8 +129,10 @@ export default function Journal() {
             onChange={(e) => setType(e.target.value)}
           >
             <option value="">All types</option>
+            <option value="quotation">Quotations</option>
             <option value="invoice">Invoices</option>
             <option value="credit_note">Credit notes</option>
+            <option value="debit_note">Debit notes</option>
             <option value="sale">Sales</option>
             <option value="expense">Expenses</option>
           </select>
@@ -149,6 +153,7 @@ export default function Journal() {
               <tr>
                 <th>Date</th>
                 <th>Type</th>
+                <th>Posting</th>
                 <th>Reference</th>
                 <th>Description</th>
                 <th>Category</th>
@@ -180,6 +185,15 @@ export default function Journal() {
                     </span>
                   </td>
                   <td>
+                    <span
+                      className={`badge ${
+                        entry.posting_status === 'draft' ? 'draft' : 'paid'
+                      }`}
+                    >
+                      {entry.posting_status === 'draft' ? 'Draft' : 'Posted'}
+                    </span>
+                  </td>
+                  <td>
                     <Link
                       to={entry.link}
                       state={{ journalReturn: listReturnPath }}
@@ -190,8 +204,8 @@ export default function Journal() {
                   </td>
                   <td>
                     {entry.description}
-                    {!entry.include_in_tally && entry.entry_type === 'invoice' ? (
-                      <span className="muted"> · open / not in tally</span>
+                    {!entry.include_in_tally ? (
+                      <span className="muted"> · not in tally</span>
                     ) : null}
                   </td>
                   <td>{entry.category || '—'}</td>
@@ -216,13 +230,14 @@ export default function Journal() {
             {totals && (
               <tfoot>
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={6}>
                     <strong>Tally</strong>
                     {totals.by_type && (
                       <span className="muted">
                         {' '}
                         · {totals.by_type.invoice} invoices ·{' '}
                         {totals.by_type.credit_note} credit notes ·{' '}
+                        {totals.by_type.debit_note || 0} debit notes ·{' '}
                         {totals.by_type.sale} sales · {totals.by_type.expense}{' '}
                         expenses
                       </span>

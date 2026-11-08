@@ -3,6 +3,32 @@ import { Link } from 'react-router-dom';
 import { api, formatDate, formatDateTime, formatMoney } from '../api.js';
 import { getAuth } from '../components/RequireAuth.jsx';
 
+function NoteIcon({ kind }) {
+  const isCredit = kind === 'credit';
+  return (
+    <svg
+      className="btn-vector"
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {isCredit ? (
+        <path
+          fill="currentColor"
+          d="M5 11h14v2H5z"
+        />
+      ) : (
+        <path
+          fill="currentColor"
+          d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"
+        />
+      )}
+    </svg>
+  );
+}
+
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [status, setStatus] = useState('');
@@ -14,6 +40,7 @@ export default function Invoices() {
   const [backupLogs, setBackupLogs] = useState([]);
   const [backupBusy, setBackupBusy] = useState(false);
   const [showBackupHistory, setShowBackupHistory] = useState(false);
+  const [genBusyId, setGenBusyId] = useState(null);
 
   async function loadBackups() {
     try {
@@ -33,7 +60,7 @@ export default function Invoices() {
     setLoading(true);
     setError('');
     try {
-      const params = {};
+      const params = { doc_type: 'invoice_board' };
       if (status) params.status = status;
       if (q.trim()) params.q = q.trim();
       setInvoices(await api.getInvoices(params));
@@ -94,6 +121,44 @@ export default function Invoices() {
     }
   }
 
+  async function handleDebitNote(id, number) {
+    if (
+      !window.confirm(
+        `Issue debit note for ${number}? The invoice stays on file and the amount is posted as additional income / charge due.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const updated = await api.issueDebitNote(id);
+      setInvoices((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, ...updated } : i))
+      );
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleGenerateInvoice(inv) {
+    if (
+      !window.confirm(
+        `Generate tax invoice from quotation ${inv.invoice_number}? This posts the journal entry.`
+      )
+    ) {
+      return;
+    }
+    setGenBusyId(inv.id);
+    setError('');
+    try {
+      await api.generateInvoiceFromQuotation(inv.id);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGenBusyId(null);
+    }
+  }
+
   async function handleDailyBackup() {
     setBackupBusy(true);
     setError('');
@@ -118,7 +183,10 @@ export default function Invoices() {
       <header className="page-header">
         <div>
           <h1>Invoices</h1>
-          <p>Create, edit, and track customer job invoices.</p>
+          <p>
+            Tax invoices and Cedrick-approved quotations ready to convert.
+            Start new jobs from Quotations.
+          </p>
         </div>
         <div className="row-actions">
           <button
@@ -129,9 +197,14 @@ export default function Invoices() {
           >
             {backupBusy ? 'Backing up…' : 'Download daily backup'}
           </button>
-          <Link className="btn btn-primary" to="/app/invoices/new">
-            New invoice
+          <Link className="btn btn-ghost" to="/app/quotations/new">
+            New quotation
           </Link>
+          {getAuth()?.role === 'owner' && (
+            <Link className="btn btn-primary" to="/app/invoices/new">
+              New invoice
+            </Link>
+          )}
         </div>
       </header>
 
@@ -239,12 +312,14 @@ export default function Invoices() {
             onChange={(e) => setStatus(e.target.value)}
           >
             <option value="">All statuses</option>
+            <option value="approved">Approved quotation</option>
             <option value="draft">Draft</option>
             <option value="sent">Sent</option>
             <option value="paid">Paid</option>
             <option value="overdue">Overdue</option>
             <option value="cancelled">Cancelled</option>
             <option value="credit_note">Credit note</option>
+            <option value="debit_note">Debit note</option>
           </select>
           <button className="btn btn-ghost" onClick={load}>
             Search
@@ -285,40 +360,92 @@ export default function Invoices() {
                   <td>{formatDate(inv.issue_date)}</td>
                   <td>
                     <span className={`badge ${inv.status}`}>
-                      {inv.status === 'credit_note'
-                        ? 'Credit note'
-                        : inv.status}
+                      {inv.doc_type === 'quotation' && inv.status === 'approved'
+                        ? 'Approved quotation'
+                        : inv.status === 'credit_note'
+                          ? 'Credit note'
+                          : inv.status === 'debit_note'
+                            ? 'Debit note'
+                            : inv.status}
                     </span>
                   </td>
                   <td>{formatMoney(inv.total)}</td>
                   <td>
-                    <div className="row-actions">
-                      <Link className="btn btn-ghost btn-sm" to={`/app/invoices/${inv.id}/edit`}>
-                        Edit
-                      </Link>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        disabled={pdfBusyId === inv.id}
-                        onClick={() => handleViewPdf(inv)}
-                      >
-                        {pdfBusyId === inv.id ? 'PDF…' : 'View PDF'}
-                      </button>
-                      <button
-                        className="btn btn-primary btn-sm"
-                        disabled={pdfBusyId === inv.id}
-                        onClick={() => handleDownloadPdf(inv)}
-                      >
-                        {pdfBusyId === inv.id ? 'PDF…' : 'Download PDF'}
-                      </button>
-                      {inv.status !== 'credit_note' && (
+                    <div className="row-actions row-actions-inline">
+                      {inv.doc_type === 'quotation' &&
+                      inv.status === 'approved' ? (
                         <button
-                          className="btn btn-danger btn-sm"
-                          onClick={() =>
-                            handleCreditNote(inv.id, inv.invoice_number)
-                          }
+                          className="btn btn-primary btn-sm"
+                          disabled={genBusyId === inv.id}
+                          onClick={() => handleGenerateInvoice(inv)}
                         >
-                          Credit note
+                          {genBusyId === inv.id
+                            ? 'Generating…'
+                            : 'Generate invoice'}
                         </button>
+                      ) : (
+                        <>
+                          <Link
+                            className="btn btn-ghost btn-sm"
+                            to={`/app/invoices/${inv.id}/edit`}
+                          >
+                            Edit
+                          </Link>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            disabled={pdfBusyId === inv.id}
+                            onClick={() => handleViewPdf(inv)}
+                          >
+                            {pdfBusyId === inv.id ? '…' : 'View'}
+                          </button>
+                          <button
+                            className="btn btn-primary btn-sm"
+                            disabled={pdfBusyId === inv.id}
+                            onClick={() => handleDownloadPdf(inv)}
+                          >
+                            {pdfBusyId === inv.id ? '…' : 'PDF'}
+                          </button>
+                          {inv.status !== 'credit_note' &&
+                            inv.status !== 'debit_note' && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn btn-danger btn-sm btn-icon"
+                                  title="Credit note"
+                                  aria-label="Credit note"
+                                  onClick={() =>
+                                    handleCreditNote(inv.id, inv.invoice_number)
+                                  }
+                                >
+                                  <NoteIcon kind="credit" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm btn-icon"
+                                  title="Debit note"
+                                  aria-label="Debit note"
+                                  onClick={() =>
+                                    handleDebitNote(inv.id, inv.invoice_number)
+                                  }
+                                >
+                                  <NoteIcon kind="debit" />
+                                </button>
+                              </>
+                            )}
+                          {inv.status === 'debit_note' && (
+                            <button
+                              type="button"
+                              className="btn btn-danger btn-sm btn-icon"
+                              title="Credit note"
+                              aria-label="Credit note"
+                              onClick={() =>
+                                handleCreditNote(inv.id, inv.invoice_number)
+                              }
+                            >
+                              <NoteIcon kind="credit" />
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </td>

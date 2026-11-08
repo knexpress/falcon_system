@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import BrandLogo from '../components/BrandLogo.jsx';
 import { SITE_IMAGES } from '../data/siteImages.js';
 import './Landing.css';
 
@@ -37,7 +38,7 @@ export default function Landing() {
     <div className="land">
       <header className="land-nav">
         <div className="land-brand">
-          <span className="land-mark">FR</span>
+          <BrandLogo className="land-mark" decorative />
           <div>
             <strong>Falcon Revive</strong>
             <small>Auto Denting &amp; Painting</small>

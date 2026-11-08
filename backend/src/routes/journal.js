@@ -5,11 +5,11 @@ const router = Router();
 
 /**
  * Unified workshop journal:
- * - Paid invoices → income (credit)
- * - Credit notes → reversal (debit)
- * - Manual / walk-in sales (no invoice link) → income (credit)
- * - Expenses → expense (debit)
- * Linked invoice payment sales are omitted so paid invoices are not double-counted.
+ * - Quotations → draft lines (not tallied)
+ * - Invoices / credit notes / debit notes → posted
+ *   (paid invoices & debit notes credit; credit notes debit)
+ * - Manual sales → posted income
+ * - Expenses → posted outflow
  */
 router.get('/', async (req, res, next) => {
   try {
@@ -17,7 +17,7 @@ router.get('/', async (req, res, next) => {
 
     const invoices = await all(
       `SELECT i.id, i.invoice_number, i.issue_date, i.status, i.total, i.notes,
-              c.name AS customer_name
+              i.doc_type, i.journal_status, c.name AS customer_name
        FROM invoices i
        JOIN customers c ON c.id = i.customer_id
        ORDER BY i.issue_date ASC, i.id ASC`
@@ -41,39 +41,70 @@ router.get('/', async (req, res, next) => {
     const entries = [];
 
     for (const inv of invoices) {
+      const isQuote = inv.doc_type === 'quotation';
       const isCreditNote = inv.status === 'credit_note';
+      const isDebitNote = inv.status === 'debit_note';
       const isPaid = inv.status === 'paid';
       const amount = Number(inv.total) || 0;
+      const journalStatus =
+        inv.journal_status || (isQuote ? 'draft' : 'posted');
 
       let debit = 0;
       let credit = 0;
-      if (isCreditNote) debit = amount;
-      else if (isPaid) credit = amount;
+      if (isQuote) {
+        // Draft preview amounts (not tallied)
+        credit = amount;
+      } else if (isCreditNote) {
+        debit = amount;
+      } else if (isDebitNote || isPaid) {
+        credit = amount;
+      } else if (journalStatus === 'posted') {
+        // Posted invoice not yet paid — show as posted memo with zero tally impact
+        credit = 0;
+      }
+
+      const entryType = isQuote
+        ? 'quotation'
+        : isCreditNote
+          ? 'credit_note'
+          : isDebitNote
+            ? 'debit_note'
+            : 'invoice';
 
       entries.push({
-        id: `invoice-${inv.id}`,
+        id: `${isQuote ? 'quotation' : 'invoice'}-${inv.id}`,
         date: inv.issue_date,
-        entry_type: isCreditNote ? 'credit_note' : 'invoice',
+        entry_type: entryType,
         reference: inv.invoice_number,
-        description: isCreditNote
-          ? `Credit note — ${inv.customer_name}`
-          : `Invoice — ${inv.customer_name}`,
-        category: isCreditNote ? 'credit_note' : inv.status,
+        description: isQuote
+          ? `Quotation — ${inv.customer_name}`
+          : isCreditNote
+            ? `Credit note — ${inv.customer_name}`
+            : isDebitNote
+              ? `Debit note — ${inv.customer_name}`
+              : `Invoice — ${inv.customer_name}`,
+        category: isQuote
+          ? inv.status
+          : isCreditNote
+            ? 'credit_note'
+            : isDebitNote
+              ? 'debit_note'
+              : inv.status,
         customer_name: inv.customer_name,
         debit,
         credit,
         amount,
         status: inv.status,
-        source: 'invoice',
+        posting_status: journalStatus,
+        source: isQuote ? 'quotation' : 'invoice',
         source_id: inv.id,
-        link: `/app/journal/${isCreditNote ? 'credit_note' : 'invoice'}/${inv.id}`,
+        link: `/app/journal/${entryType}/${inv.id}`,
         notes: inv.notes || null,
-        include_in_tally: isCreditNote || isPaid,
+        include_in_tally: !isQuote && (isCreditNote || isDebitNote || isPaid),
       });
     }
 
     for (const sale of sales) {
-      // Skip sales that mirror a paid invoice (already counted above)
       if (sale.invoice_id) continue;
 
       const amount = Number(sale.amount) || 0;
@@ -89,6 +120,7 @@ router.get('/', async (req, res, next) => {
         credit: amount,
         amount,
         status: sale.payment_method || 'cash',
+        posting_status: 'posted',
         source: 'sale',
         source_id: sale.id,
         link: `/app/journal/sale/${sale.id}`,
@@ -111,6 +143,7 @@ router.get('/', async (req, res, next) => {
         credit: 0,
         amount,
         status: expense.payment_method || 'cash',
+        posting_status: 'posted',
         source: 'expense',
         source_id: expense.id,
         link: `/app/journal/expense/${expense.id}`,
@@ -155,8 +188,11 @@ router.get('/', async (req, res, next) => {
     );
 
     const byType = {
+      quotation: withBalance.filter((e) => e.entry_type === 'quotation').length,
       invoice: withBalance.filter((e) => e.entry_type === 'invoice').length,
       credit_note: withBalance.filter((e) => e.entry_type === 'credit_note')
+        .length,
+      debit_note: withBalance.filter((e) => e.entry_type === 'debit_note')
         .length,
       sale: withBalance.filter((e) => e.entry_type === 'sale').length,
       expense: withBalance.filter((e) => e.entry_type === 'expense').length,
@@ -169,6 +205,8 @@ router.get('/', async (req, res, next) => {
         credit: Math.round(totalCredit * 100) / 100,
         net: Math.round((totalCredit - totalDebit) * 100) / 100,
         count: withBalance.length,
+        drafts: withBalance.filter((e) => e.posting_status === 'draft').length,
+        posted: withBalance.filter((e) => e.posting_status === 'posted').length,
         by_type: byType,
       },
     });

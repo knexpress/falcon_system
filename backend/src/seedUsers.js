@@ -3,8 +3,8 @@ import { initDb, get, run, all } from './db.js';
 
 const USERS = [
   {
-    name: 'Admin',
-    username: 'admin@falconrevive.ae',
+    name: 'Cedrick',
+    username: 'cedrick@falconrevive.ae',
     password: 'falcon@123',
     role: 'owner',
   },
@@ -55,7 +55,7 @@ async function main() {
     console.log(`${result.action}: ${result.username}`);
   }
 
-  // Keep only the email logins active; disable old short usernames if present
+  // Keep only the active team logins; disable older accounts (e.g. admin@)
   const keep = USERS.map((u) => u.username.toLowerCase());
   const others = await all('SELECT id, username FROM users');
   for (const row of others) {

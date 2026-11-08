@@ -9,6 +9,9 @@
     "dev": "node --watch src/index.js",
     "seed": "node src/seed.js",
     "seed:users": "node src/seedUsers.js",
+    "db:up": "docker compose -f ../docker-compose.yml up -d",
+    "db:down": "docker compose -f ../docker-compose.yml down",
+    "db:reset": "docker compose -f ../docker-compose.yml down -v && docker compose -f ../docker-compose.yml up -d && node src/seedUsers.js",
     "postinstall": "node scripts/install-python-deps.js"
   },
   "dependencies": {

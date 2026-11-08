@@ -14,16 +14,23 @@ export async function syncInvoiceSale(
     client
   );
 
-  if (status === 'paid' && Number(total) > 0) {
+  if ((status === 'paid' || status === 'debit_note') && Number(total) > 0) {
+    const description =
+      status === 'debit_note'
+        ? `Debit note for ${invoiceNumber}`
+        : `Payment for ${invoiceNumber}`;
+    const category = status === 'debit_note' ? 'debit_note' : 'invoice';
+
     if (existing) {
       await run(
         `UPDATE sales SET
-          sale_date = ?, description = ?, category = 'invoice',
+          sale_date = ?, description = ?, category = ?,
           amount = ?, payment_method = 'invoice', notes = ?
          WHERE id = ?`,
         [
           issueDate,
-          `Payment for ${invoiceNumber}`,
+          description,
+          category,
           Number(total),
           notes || null,
           existing.id,
@@ -34,11 +41,12 @@ export async function syncInvoiceSale(
       await run(
         `INSERT INTO sales
          (invoice_id, sale_date, description, category, amount, payment_method, notes)
-         VALUES (?, ?, ?, 'invoice', ?, 'invoice', ?)`,
+         VALUES (?, ?, ?, ?, ?, 'invoice', ?)`,
         [
           invoiceId,
           issueDate,
-          `Payment for ${invoiceNumber}`,
+          description,
+          category,
           Number(total),
           notes || null,
         ],

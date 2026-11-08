@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, todayISO } from '../api.js';
 import { InvoiceDocumentPreview } from '../components/InvoiceDocument.jsx';
+import { getAuth } from '../components/RequireAuth.jsx';
 import {
   MAIN_SERVICES,
   categoryNeedsVehicle,
@@ -23,13 +24,20 @@ const emptyItem = () => ({
   pricing_option: '',
 });
 
-export default function InvoiceForm() {
+export default function InvoiceForm({ forceDocType } = {}) {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
   const location = useLocation();
+  const auth = getAuth();
+  const isStaff = auth?.role === 'staff';
+  const docType =
+    forceDocType ||
+    (location.pathname.includes('/quotations') ? 'quotation' : 'invoice');
+  const isQuotation = docType === 'quotation';
   const journalReturn = location.state?.journalReturn;
-  const backTo = journalReturn || '/app/invoices';
+  const backTo =
+    journalReturn || (isQuotation ? '/app/quotations' : '/app/invoices');
   const backLabel = journalReturn ? '← Back to journal' : 'Cancel';
 
   const [customers, setCustomers] = useState([]);
@@ -37,6 +45,8 @@ export default function InvoiceForm() {
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [invoiceNumber, setInvoiceNumber] = useState('·····');
+  const [ownerNote, setOwnerNote] = useState('');
+  const [docStatus, setDocStatus] = useState('');
   const [form, setForm] = useState({
     customer_id: '',
     customer_name: '',
@@ -52,9 +62,9 @@ export default function InvoiceForm() {
     mileage: '',
     issue_date: todayISO(),
     due_date: '',
-    status: 'draft',
+    status: 'sent',
     notes: '',
-    prepared_by: '',
+    prepared_by: auth?.name || '',
     authorized_by: '',
     received_by: '',
     tax_rate: 5,
@@ -73,6 +83,8 @@ export default function InvoiceForm() {
       .getInvoice(id)
       .then((inv) => {
         setInvoiceNumber(inv.invoice_number);
+        setOwnerNote(inv.approval_note || '');
+        setDocStatus(inv.status || '');
         setForm({
           customer_id: String(inv.customer_id),
           customer_name: inv.customer_name || '',
@@ -88,7 +100,7 @@ export default function InvoiceForm() {
           mileage: inv.mileage || '',
           issue_date: inv.issue_date,
           due_date: inv.due_date || '',
-          status: inv.status,
+          status: inv.requested_status || 'sent',
           notes: inv.notes || '',
           prepared_by: inv.prepared_by || '',
           authorized_by: inv.authorized_by || '',
@@ -255,6 +267,7 @@ export default function InvoiceForm() {
       const customerId = await ensureCustomerId();
       const payload = {
         ...form,
+        doc_type: docType,
         customer_id: customerId,
         tax_rate: Number(form.tax_rate) || 5,
         discount: Number(form.discount) || 0,
@@ -271,7 +284,11 @@ export default function InvoiceForm() {
       const saved = isEdit
         ? await api.updateInvoice(id, payload)
         : await api.createInvoice(payload);
-      navigate(`/app/invoices/${saved.id}`);
+      navigate(
+        isQuotation
+          ? `/app/quotations/${saved.id}`
+          : `/app/invoices/${saved.id}`
+      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -283,10 +300,19 @@ export default function InvoiceForm() {
     <div>
       <header className="page-header">
         <div>
-          <h1>{isEdit ? 'Edit invoice' : 'New invoice'}</h1>
+          <h1>
+            {isEdit
+              ? isQuotation
+                ? 'Edit quotation'
+                : 'Edit invoice'
+              : isQuotation
+                ? 'New quotation'
+                : 'New invoice'}
+          </h1>
           <p>
-            Fields map onto the Falcon Revive Tax Invoice template — preview
-            updates as you type.
+            {isQuotation
+              ? 'Same workshop fields as an invoice — saved as a quotation for Cedrick’s approval first.'
+              : 'Fields map onto the Falcon Revive Tax Invoice template — preview updates as you type.'}
           </p>
         </div>
         <div className="row-actions">
@@ -306,6 +332,28 @@ export default function InvoiceForm() {
       <div className={showPreview ? 'invoice-workbench' : ''}>
         <form className="panel" onSubmit={handleSubmit}>
           {error && <div className="error-banner">{error}</div>}
+          {isQuotation && docStatus === 'changes_requested' && ownerNote && (
+            <div className="error-banner">
+              <strong>Cedrick asked for changes:</strong> {ownerNote}
+              <br />
+              Edit the quotation and save — it will go back to Approvals.
+            </div>
+          )}
+          {isQuotation && docStatus !== 'changes_requested' && (
+            <div
+              className="success-banner"
+              style={{
+                background: 'var(--warn-bg)',
+                color: 'var(--warn)',
+                borderColor: 'rgba(183, 121, 31, 0.35)',
+              }}
+            >
+              This quotation will wait in Approvals for Cedrick. After he
+              approves it, use <strong>Generate invoice</strong> on the Invoices
+              page. A draft journal line is created now; it posts when the
+              invoice is generated.
+            </div>
+          )}
 
           <h2 className="form-section-title">Customer details</h2>
           <div className="form-grid">
@@ -404,6 +452,7 @@ export default function InvoiceForm() {
                 <option value="overdue">Overdue</option>
                 <option value="cancelled">Cancelled</option>
                 <option value="credit_note">Credit note</option>
+                <option value="debit_note">Debit note</option>
               </select>
             </div>
             <div className="field">

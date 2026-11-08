@@ -271,9 +271,33 @@ export async function initDb() {
   await ensureColumn('invoices', 'authorized_by', 'TEXT');
   await ensureColumn('invoices', 'received_by', 'TEXT');
   await ensureColumn('invoices', 'vehicle_id', 'INTEGER');
+  await ensureColumn('invoices', 'created_by', 'TEXT');
+  await ensureColumn('invoices', 'requested_status', 'TEXT');
+  await ensureColumn('invoices', 'approved_by', 'TEXT');
+  await ensureColumn('invoices', 'approved_at', 'TIMESTAMPTZ');
+  await ensureColumn('invoices', 'approval_note', 'TEXT');
+  await ensureColumn(
+    'invoices',
+    'doc_type',
+    "TEXT NOT NULL DEFAULT 'invoice'"
+  );
+  await ensureColumn(
+    'invoices',
+    'journal_status',
+    "TEXT NOT NULL DEFAULT 'posted'"
+  );
+  // Backfill any nulls from older rows
+  await pool.query(
+    `UPDATE invoices SET doc_type = 'invoice' WHERE doc_type IS NULL OR doc_type = ''`
+  );
+  await pool.query(
+    `UPDATE invoices SET journal_status = 'posted'
+     WHERE journal_status IS NULL OR journal_status = ''`
+  );
   await ensureColumn('invoice_items', 'unit', "TEXT NOT NULL DEFAULT 'Job'");
   await ensureColumn('invoice_items', 'vat_rate', 'DOUBLE PRECISION NOT NULL DEFAULT 5');
   await ensureColumn('invoice_items', 'vat_amount', 'DOUBLE PRECISION NOT NULL DEFAULT 0');
+  await ensureColumn('users', 'avatar_url', 'TEXT');
 
   return pool;
 }

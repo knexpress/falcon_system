@@ -3,8 +3,10 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, formatDate, formatMoney } from '../api.js';
 
 const TYPE_LABELS = {
+  quotation: 'Quotation',
   invoice: 'Invoice',
   credit_note: 'Credit note',
+  debit_note: 'Debit note',
   sale: 'Sale',
   expense: 'Expense',
 };
@@ -25,12 +27,7 @@ export default function JournalEntry() {
     return back ? decodeURIComponent(back) : '/app/journal';
   }, [location.state, location.search]);
 
-  const entryType =
-    type === 'credit_note' || type === 'invoice'
-      ? type === 'credit_note'
-        ? 'credit_note'
-        : 'invoice'
-      : type;
+  const entryType = type;
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +36,12 @@ export default function JournalEntry() {
       setError('');
       try {
         let data = null;
-        if (type === 'invoice' || type === 'credit_note') {
+        if (
+          type === 'invoice' ||
+          type === 'credit_note' ||
+          type === 'debit_note' ||
+          type === 'quotation'
+        ) {
           data = await api.getInvoice(id);
         } else if (type === 'sale') {
           data = await api.getSale(id);
@@ -77,7 +79,11 @@ export default function JournalEntry() {
     );
   }
 
-  const isInvoice = type === 'invoice' || type === 'credit_note';
+  const isInvoice =
+    type === 'invoice' ||
+    type === 'credit_note' ||
+    type === 'debit_note' ||
+    type === 'quotation';
   const isSale = type === 'sale';
   const isExpense = type === 'expense';
 
@@ -88,7 +94,13 @@ export default function JournalEntry() {
       : `EXP-${record.id}`;
 
   const subtitle = isInvoice
-    ? `${record.customer_name || 'Customer'} · ${record.status}`
+    ? `${record.customer_name || 'Customer'} · ${
+        record.status === 'credit_note'
+          ? 'Credit note'
+          : record.status === 'debit_note'
+            ? 'Debit note'
+            : record.status
+      }`
     : isSale
       ? record.description
       : record.description;
@@ -186,7 +198,9 @@ export default function JournalEntry() {
                   <span className={`badge ${record.status}`}>
                     {record.status === 'credit_note'
                       ? 'Credit note'
-                      : record.status}
+                      : record.status === 'debit_note'
+                        ? 'Debit note'
+                        : record.status}
                   </span>
                 </dd>
               </div>
