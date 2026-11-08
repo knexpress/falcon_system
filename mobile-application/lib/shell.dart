@@ -130,10 +130,18 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final role = context.watch<AuthStore>().user?.role;
+    final user = context.watch<AuthStore>().user;
+    final role = user?.role;
     // Profile opens from the emblem — keep chips for workspace pages only.
     final items =
         visibleNav(role).where((n) => n.key != 'Profile').toList();
+    if (items.isNotEmpty &&
+        _active != 'Profile' &&
+        !items.any((n) => n.key == _active)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _active = items.first.key);
+      });
+    }
 
     return GlassBackground(
       child: Scaffold(

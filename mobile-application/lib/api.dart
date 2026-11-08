@@ -3,11 +3,10 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'auth.dart';
 
-/// Prefer `adb reverse tcp:4000 tcp:4000` + http://127.0.0.1:4000 on emulator.
-/// Physical device → your PC LAN IP. Fallback 10.0.2.2 maps emulator → host.
+/// Override with --dart-define=API_URL=... for local/dev.
 const String kApiBase = String.fromEnvironment(
   'API_URL',
-  defaultValue: 'http://127.0.0.1:4000',
+  defaultValue: 'https://falcon-system-vjgr.onrender.com',
 );
 
 class ApiException implements Exception {

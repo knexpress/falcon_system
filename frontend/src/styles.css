@@ -188,8 +188,15 @@ a {
   padding: 4px;
 }
 
-.glass-shell .rail-brand-logo,
 .brand-logo {
+  display: block;
+  object-fit: contain;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Only the glass rail box should stretch the logo to fill its 52px frame */
+.glass-shell .rail-brand-logo {
   width: 100%;
   height: 100%;
   object-fit: contain;

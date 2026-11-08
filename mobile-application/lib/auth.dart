@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'permissions.dart';
 
 class FalconUser {
   FalconUser({
@@ -19,6 +20,7 @@ class FalconUser {
 
   bool get isOwner => role.toLowerCase() == 'owner';
   bool get isStaff => role.toLowerCase() == 'staff';
+  FalconPermissions get permissions => FalconPermissions.fromRole(role);
 
   factory FalconUser.fromJson(Map<String, dynamic> json) => FalconUser(
         id: json['id'],
@@ -71,27 +73,26 @@ class AuthStore extends ChangeNotifier {
 }
 
 class NavItem {
-  const NavItem(this.key, this.label, this.roles);
+  const NavItem(this.key, this.label);
   final String key;
   final String label;
-  final List<String> roles;
 }
 
 const navItems = <NavItem>[
-  NavItem('Dashboard', 'Home', ['owner', 'staff']),
-  NavItem('Approvals', 'Approvals', ['owner']),
-  NavItem('Quotations', 'Quotes', ['staff']),
-  NavItem('Invoices', 'Invoices', ['staff']),
-  NavItem('Vehicles', 'Vehicles', ['owner', 'staff']),
-  NavItem('Inventory', 'Stock', ['owner', 'staff']),
-  NavItem('Customers', 'Clients', ['owner', 'staff']),
-  NavItem('Sales', 'Sales', ['staff']),
-  NavItem('Expenses', 'Expenses', ['staff']),
-  NavItem('Journal', 'Journal', ['staff']),
-  NavItem('Profile', 'Profile', ['owner', 'staff']),
+  NavItem('Dashboard', 'Home'),
+  NavItem('Approvals', 'Approvals'),
+  NavItem('Quotations', 'Quotes'),
+  NavItem('Invoices', 'Invoices'),
+  NavItem('Vehicles', 'Vehicles'),
+  NavItem('Inventory', 'Stock'),
+  NavItem('Customers', 'Clients'),
+  NavItem('Sales', 'Sales'),
+  NavItem('Expenses', 'Expenses'),
+  NavItem('Journal', 'Journal'),
+  NavItem('Profile', 'Profile'),
 ];
 
 List<NavItem> visibleNav(String? role) {
-  final r = (role ?? 'staff').toLowerCase();
-  return navItems.where((n) => n.roles.contains(r)).toList();
+  final perms = FalconPermissions.fromRole(role);
+  return navItems.where((n) => perms.allowsNavKey(n.key)).toList();
 }

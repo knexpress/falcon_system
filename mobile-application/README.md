@@ -32,12 +32,19 @@ flutter run --dart-define=API_URL=http://192.168.1.10:4000
 flutter run --dart-define=API_URL=https://your-api.onrender.com
 ```
 
-## Roles (same as web)
+## Sign-in & permissions
 
-| Role | Screens |
-|---|---|
-| Owner (Cedrick) | Home, Approvals, Vehicles, Stock, Clients, Profile |
-| Staff | Home, Quotes, Invoices, Vehicles, Stock, Clients, Sales, Expenses, Journal, Profile |
+Any **active** team user can sign in. Screens follow role permissions:
+
+| Permission | Owner (Cedrick, Arnie) | Staff (Mariel) |
+|---|---|---|
+| Approvals | yes | no |
+| Quotes / Invoices | yes (oversight) | yes |
+| Vehicles / Stock / Clients | yes | yes |
+| Sales / Expenses / Journal | no | yes |
+| Profile + push alerts | yes | yes |
+
+Login: `arnie@falconrevive.ae` / `falcon@123` (owner — can approve quotations).
 
 ## APK release
 

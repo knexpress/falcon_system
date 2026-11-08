@@ -74,15 +74,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           if (d != null) ...[
             const SizedBox(height: 16),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _metric('Month income', money(d['month_income'] ?? d['month_sales']), FalconColors.violet),
-                _metric('Month expenses', money(d['month_expenses']), FalconColors.blue),
-                _metric('Month profit', money(d['month_profit']), FalconColors.mint),
-                _metric('Outstanding', money(d['outstanding_amount']), FalconColors.peach),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const gap = 10.0;
+                final cardW = (constraints.maxWidth - gap) / 2;
+                final metrics = [
+                  (
+                    'Month income',
+                    money(d['month_income'] ?? d['month_sales']),
+                    FalconColors.violet
+                  ),
+                  (
+                    'Month expenses',
+                    money(d['month_expenses']),
+                    FalconColors.blue
+                  ),
+                  (
+                    'Month profit',
+                    money(d['month_profit']),
+                    FalconColors.mint
+                  ),
+                  (
+                    'Outstanding',
+                    money(d['outstanding_amount']),
+                    FalconColors.peach
+                  ),
+                ];
+                return Column(
+                  children: [
+                    for (var row = 0; row < 2; row++) ...[
+                      if (row > 0) const SizedBox(height: gap),
+                      Row(
+                        children: [
+                          for (var col = 0; col < 2; col++) ...[
+                            if (col > 0) const SizedBox(width: gap),
+                            SizedBox(
+                              width: cardW,
+                              child: _metric(
+                                metrics[row * 2 + col].$1,
+                                metrics[row * 2 + col].$2,
+                                metrics[row * 2 + col].$3,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 14),
             GlassCard(
@@ -133,70 +173,78 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _metric(String label, String value, Color color) {
-    return SizedBox(
-      width: 168,
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 96),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.35),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
+    return Container(
+      height: 92,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.28),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      color,
+                      Color.lerp(color, Colors.white, 0.18)!,
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        color,
-                        Color.lerp(color, Colors.white, 0.18)!,
-                      ],
+            Positioned(
+              right: -14,
+              top: -14,
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.16),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.94),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12.5,
                     ),
                   ),
-                ),
-              ),
-              Positioned(
-                right: -18,
-                top: -18,
-                child: Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.18),
+                  const Spacer(),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
                   ),
-                ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label,
-                        style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.94),
-                            fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 10),
-                    Text(value,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 17)),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

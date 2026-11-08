@@ -8,6 +8,9 @@
   --gold: #c6a15b;
   --danger: #b42318;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   background: var(--ink);
   color: var(--paper);
   font-family: 'DM Sans', system-ui, sans-serif;
@@ -25,7 +28,13 @@
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 16px 4vw;
+  width: 100%;
+  max-width: 100%;
+  min-height: 72px;
+  height: auto;
+  padding: 12px 4vw;
+  box-sizing: border-box;
+  overflow: hidden;
   background: rgba(14, 18, 16, 0.88);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(198, 161, 91, 0.18);
@@ -35,6 +44,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .land-brand strong {
@@ -50,9 +61,12 @@
   font-size: 0.78rem;
 }
 
-.land-mark {
-  width: 52px;
-  height: 52px;
+.land-nav .land-mark,
+.land-nav .brand-logo.land-mark {
+  width: 52px !important;
+  height: 52px !important;
+  max-width: 52px !important;
+  max-height: 52px !important;
   object-fit: contain;
   display: block;
   flex-shrink: 0;

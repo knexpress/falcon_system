@@ -65,7 +65,7 @@ Details: `mobile-application/README.md`.
 | Build Command | `npm install` |
 | Start Command | `npm start` |
 | Env `DATABASE_URL` | your Postgres URL |
-| Env `CORS_ORIGIN` | your Vercel frontend URL, e.g. `https://falcon.vercel.app` |
+| Env `CORS_ORIGIN` | `*` to allow all, or your Vercel URL(s), comma-separated |
 | Instance | Free (sleeps when idle) |
 
 ### Frontend (Vercel)

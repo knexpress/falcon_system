@@ -27,29 +27,32 @@ import { syncCustomersAndVehiclesFromInvoices } from './syncFromInvoices.js';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-/** Frontend URL(s) allowed to call this API. Comma-separated if needed. */
+/** Frontend URL(s) allowed to call this API. Comma-separated, or `*` for all. */
 const corsOrigin = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map((o) => o.trim().replace(/\/$/, ''))
   .filter(Boolean);
+const corsAllowAll = corsOrigin.includes('*');
 
 if (corsOrigin.length === 0) {
   console.warn(
-    'CORS_ORIGIN is not set — all browser origins are blocked. Set e.g. CORS_ORIGIN=https://your-app.vercel.app'
+    'CORS_ORIGIN is not set — all browser origins are blocked. Set CORS_ORIGIN=* or your Vercel URL(s).'
   );
 }
 
 app.use(
   cors({
     origin(origin, callback) {
-      // Non-browser clients (curl, health checks) send no Origin
+      // Non-browser clients (mobile app, curl, health checks) send no Origin
       if (!origin) return callback(null, true);
+      if (corsAllowAll) return callback(null, true);
       const normalized = origin.replace(/\/$/, '');
       if (corsOrigin.includes(normalized)) return callback(null, true);
       console.warn(`Blocked CORS origin: ${origin}`);
       return callback(null, false);
     },
-    credentials: true,
+    // credentials + * is invalid in browsers; disable when allowing all
+    credentials: !corsAllowAll,
     exposedHeaders: [
       'Content-Disposition',
       'X-Falcon-Backup-Id',

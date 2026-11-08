@@ -65,17 +65,23 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: FalconColors.ink,
                               ),
                     ),
-                    const Text(
-                      'Workshop ERP mobile desk',
-                      style: TextStyle(color: FalconColors.muted),
-                    ),
-                    const SizedBox(height: 24),
-                    GlassCard(
-                      strong: true,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (_error != null) ...[
+                  const Text(
+                    'Workshop ERP mobile desk',
+                    style: TextStyle(color: FalconColors.muted),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'All active team users can sign in. Screens follow your role permissions (owner vs staff).',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: FalconColors.muted, fontSize: 13),
+                  ),
+                  const SizedBox(height: 24),
+                  GlassCard(
+                    strong: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_error != null) ...[
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(

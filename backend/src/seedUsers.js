@@ -18,7 +18,7 @@ const USERS = [
     name: 'Arnie',
     username: 'arnie@falconrevive.ae',
     password: 'falcon@123',
-    role: 'staff',
+    role: 'owner', // same approval powers as Cedrick
   },
 ];
 

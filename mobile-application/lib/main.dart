@@ -32,6 +32,10 @@ Future<void> _syncBackgroundWithAuth(AuthStore auth) async {
     await stopSilentBackground();
     return;
   }
+  if (!user.permissions.canReceivePush) {
+    await stopSilentBackground();
+    return;
+  }
   try {
     await enablePushAndBackground();
     await Api(auth).registerDevice(
