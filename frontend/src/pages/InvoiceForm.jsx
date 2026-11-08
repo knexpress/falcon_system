@@ -11,6 +11,7 @@ import {
   getVehicleOptions,
   resolvePricing,
 } from '../data/pricingCatalog.js';
+import { isStaffRole } from '../roles.js';
 
 const emptyItem = () => ({
   description: '',
@@ -30,7 +31,7 @@ export default function InvoiceForm({ forceDocType } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const auth = getAuth();
-  const isStaff = auth?.role === 'staff';
+  const isStaff = isStaffRole(auth?.role);
   const docType =
     forceDocType ||
     (location.pathname.includes('/quotations') ? 'quotation' : 'invoice');

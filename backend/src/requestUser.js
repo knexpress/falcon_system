@@ -16,10 +16,26 @@ export async function getRequestUser(req) {
   );
 }
 
-export function isOwner(user) {
-  return user && String(user.role).toLowerCase() === 'owner';
+function roleOf(user) {
+  return String(user?.role || '')
+    .toLowerCase()
+    .trim();
 }
 
+export function isSuperAdmin(user) {
+  return Boolean(user) && roleOf(user) === 'superadmin';
+}
+
+/** Owner powers (approvals) — also granted to superadmin. */
+export function isOwner(user) {
+  if (!user) return false;
+  const role = roleOf(user);
+  return role === 'owner' || role === 'superadmin';
+}
+
+/** Staff powers (create docs / finance ops) — also granted to superadmin. */
 export function isStaff(user) {
-  return user && String(user.role).toLowerCase() === 'staff';
+  if (!user) return false;
+  const role = roleOf(user);
+  return role === 'staff' || role === 'superadmin';
 }

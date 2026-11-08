@@ -200,11 +200,9 @@ export default function Invoices() {
           <Link className="btn btn-ghost" to="/app/quotations/new">
             New quotation
           </Link>
-          {getAuth()?.role === 'owner' && (
-            <Link className="btn btn-primary" to="/app/invoices/new">
-              New invoice
-            </Link>
-          )}
+          <Link className="btn btn-primary" to="/app/invoices/new">
+            New invoice
+          </Link>
         </div>
       </header>
 

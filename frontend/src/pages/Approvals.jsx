@@ -3,10 +3,11 @@ import { Link, Navigate } from 'react-router-dom';
 import { api, formatDate, formatMoney } from '../api.js';
 import { getAuth } from '../components/RequireAuth.jsx';
 import InvoiceDocument from '../components/InvoiceDocument.jsx';
+import { isOwnerRole } from '../roles.js';
 
 export default function Approvals() {
   const auth = getAuth();
-  const isOwner = auth?.role === 'owner';
+  const isOwner = isOwnerRole(auth?.role);
   const [rows, setRows] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);

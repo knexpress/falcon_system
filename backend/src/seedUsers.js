@@ -3,6 +3,18 @@ import { initDb, get, run, all } from './db.js';
 
 const USERS = [
   {
+    name: 'Ali Abdullah',
+    username: 'aliabdullah@falconrevive.ae',
+    password: 'falcon@123',
+    role: 'superadmin', // full access to every screen and action
+  },
+  {
+    name: 'Sheryl',
+    username: 'sheryl@falconrevive.ae',
+    password: 'falcon@123',
+    role: 'superadmin', // full access to every screen and action
+  },
+  {
     name: 'Cedrick',
     username: 'cedrick@falconrevive.ae',
     password: 'falcon@123',

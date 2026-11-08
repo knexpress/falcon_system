@@ -60,7 +60,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     fontWeight: FontWeight.w800,
                   )),
           Text(
-            'Hello ${auth?.name ?? 'team'} · ${auth?.isOwner == true ? 'Owner' : 'Staff'}',
+            'Hello ${auth?.name ?? 'team'} · ${auth?.isSuperAdmin == true ? 'Superadmin' : auth?.isOwner == true ? 'Owner' : 'Staff'}',
             style: const TextStyle(color: FalconColors.muted),
           ),
           if (_error != null) ...[

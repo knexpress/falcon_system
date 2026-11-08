@@ -3,6 +3,7 @@ import { Lottie } from 'lottie-react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { clearAuth, getAuth } from './RequireAuth.jsx';
+import { isStaffRole, navAllows } from '../roles.js';
 import BrandLogo from './BrandLogo.jsx';
 import ProfileMenu from './ProfileMenu.jsx';
 
@@ -182,9 +183,7 @@ export default function AppShell() {
   const location = useLocation();
   const auth = getAuth();
   const role = auth?.role || 'staff';
-  const visibleNav = nav.filter((item) =>
-    (item.roles || ['owner', 'staff']).includes(role)
-  );
+  const visibleNav = nav.filter((item) => navAllows(item.roles, role));
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_KEY);
     return saved === null ? true : saved === '1';
@@ -352,7 +351,7 @@ export default function AppShell() {
                 Invoices when ready.
               </div>
               <div className="row-actions">
-                {role === 'staff' && (
+                {isStaffRole(role) && (
                   <Link className="btn btn-primary btn-sm" to="/app/invoices">
                     Go to Invoices
                   </Link>

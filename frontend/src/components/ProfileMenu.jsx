@@ -157,7 +157,12 @@ export default function ProfileMenu({ onLogout }) {
     onLogout?.();
   }
 
-  const roleLabel = auth?.role === 'owner' ? 'Owner' : 'Staff';
+  const roleLabel =
+    auth?.role === 'superadmin'
+      ? 'Superadmin'
+      : auth?.role === 'owner'
+        ? 'Owner'
+        : 'Staff';
 
   return (
     <div className="profile-menu" ref={rootRef}>

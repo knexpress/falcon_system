@@ -31,12 +31,29 @@ class FalconPermissions {
   final bool canEditProfile;
   final bool canReceivePush;
 
-  bool get isOwner => role == 'owner';
-  bool get isStaff => role == 'staff';
+  bool get isSuperAdmin => role == 'superadmin';
+  bool get isOwner => role == 'owner' || role == 'superadmin';
+  bool get isStaff => role == 'staff' || role == 'superadmin';
 
   factory FalconPermissions.fromRole(String? rawRole) {
     final role = (rawRole ?? 'staff').toLowerCase().trim();
     switch (role) {
+      case 'superadmin':
+        return const FalconPermissions(
+          role: 'superadmin',
+          canViewDashboard: true,
+          canApproveQuotations: true,
+          canManageQuotations: true,
+          canManageInvoices: true,
+          canViewVehicles: true,
+          canViewInventory: true,
+          canViewCustomers: true,
+          canViewSales: true,
+          canViewExpenses: true,
+          canViewJournal: true,
+          canEditProfile: true,
+          canReceivePush: true,
+        );
       case 'owner':
         return const FalconPermissions(
           role: 'owner',

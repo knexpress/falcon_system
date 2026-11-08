@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, formatDate, formatMoney } from '../api.js';
 import { getAuth } from '../components/RequireAuth.jsx';
+import { isOwnerRole, isStaffRole } from '../roles.js';
 
 function initials(name) {
   return String(name || 'FR')
@@ -155,6 +156,8 @@ function PerformanceChart({ income, expenses, profit }) {
 
 export default function Dashboard() {
   const auth = getAuth();
+  const ownerLike = isOwnerRole(auth?.role);
+  const staffLike = isStaffRole(auth?.role);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
@@ -190,13 +193,13 @@ export default function Dashboard() {
           <p>Workshop cashflow, invoices, and books at a glance.</p>
         </div>
         <div className="row-actions">
-          {auth?.role === 'owner' && (
+          {ownerLike && (
             <Link className="btn btn-ghost" to="/app/approvals">
               Approvals
               {data.pending_approvals ? ` (${data.pending_approvals})` : ''}
             </Link>
           )}
-          {auth?.role === 'staff' && (
+          {staffLike && (
             <Link className="btn btn-primary" to="/app/invoices/new">
               New invoice
             </Link>
@@ -204,7 +207,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {auth?.role === 'owner' && Number(data.pending_approvals) > 0 && (
+      {ownerLike && Number(data.pending_approvals) > 0 && (
         <div className="backup-login-notice glass-notice" style={{ marginBottom: 16 }}>
           <div>
             <strong>{data.pending_approvals}</strong> quotation
@@ -295,7 +298,7 @@ export default function Dashboard() {
                         Expense categories power this chart and month profit.
                       </p>
                     </div>
-                    {auth?.role === 'staff' ? (
+                    {staffLike ? (
                       <Link className="btn btn-ghost btn-sm" to="/app/expenses">
                         Add
                       </Link>
@@ -311,7 +314,7 @@ export default function Dashboard() {
                         Paid invoices feed income, performance, and journal.
                       </p>
                     </div>
-                    {auth?.role === 'staff' ? (
+                    {staffLike ? (
                       <Link className="btn btn-ghost btn-sm" to="/app/invoices">
                         Open
                       </Link>
@@ -371,7 +374,7 @@ export default function Dashboard() {
               <span className="chip soft">
                 {data.low_stock_count || 0} low stock
               </span>
-              {auth?.role === 'owner' && Number(data.pending_approvals) > 0 ? (
+              {ownerLike && Number(data.pending_approvals) > 0 ? (
                 <Link className="chip soft" to="/app/approvals">
                   {data.pending_approvals} to approve
                 </Link>
@@ -389,15 +392,15 @@ export default function Dashboard() {
                 <EmptyHint
                   title="No invoices yet"
                   body={
-                    auth?.role === 'staff'
+                    staffLike
                       ? 'Create a quotation or tax invoice to see customers and totals land here.'
                       : 'Once Mariel or Arnie issue invoices, the latest five appear in this list for a quick check.'
                   }
                   actionTo={
-                    auth?.role === 'staff' ? '/app/invoices/new' : '/app/approvals'
+                    staffLike ? '/app/invoices/new' : '/app/approvals'
                   }
                   actionLabel={
-                    auth?.role === 'staff' ? 'New invoice' : 'Open approvals'
+                    staffLike ? 'New invoice' : 'Open approvals'
                   }
                 />
               ) : (
@@ -433,7 +436,7 @@ export default function Dashboard() {
                 <h2>Recent expenses</h2>
                 <p className="panel-sub">Latest outflow</p>
               </div>
-              {auth?.role === 'staff' ? (
+              {staffLike ? (
                 <Link className="btn btn-ghost btn-sm" to="/app/expenses">
                   Add expense
                 </Link>
@@ -444,8 +447,8 @@ export default function Dashboard() {
                 <EmptyHint
                   title="Books look quiet"
                   body="Record paint, parts, tools, or vendor bills so month expenses and the profit chart stay accurate."
-                  actionTo={auth?.role === 'staff' ? '/app/expenses' : null}
-                  actionLabel={auth?.role === 'staff' ? 'Log first expense' : null}
+                  actionTo={staffLike ? '/app/expenses' : null}
+                  actionLabel={staffLike ? 'Log first expense' : null}
                 />
               ) : (
                 data.recent_expenses.map((exp) => (

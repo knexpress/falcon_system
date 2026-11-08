@@ -18,8 +18,11 @@ class FalconUser {
   final String role;
   final String? avatarUrl;
 
-  bool get isOwner => role.toLowerCase() == 'owner';
-  bool get isStaff => role.toLowerCase() == 'staff';
+  bool get isSuperAdmin => role.toLowerCase() == 'superadmin';
+  bool get isOwner =>
+      role.toLowerCase() == 'owner' || role.toLowerCase() == 'superadmin';
+  bool get isStaff =>
+      role.toLowerCase() == 'staff' || role.toLowerCase() == 'superadmin';
   FalconPermissions get permissions => FalconPermissions.fromRole(role);
 
   factory FalconUser.fromJson(Map<String, dynamic> json) => FalconUser(
