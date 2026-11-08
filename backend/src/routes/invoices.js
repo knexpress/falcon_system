@@ -9,6 +9,11 @@ import { generateInvoicePdf } from '../generatePdf.js';
 import { syncInvoiceSale } from '../syncInvoiceSale.js';
 import { upsertVehicleFromInvoice } from '../vehicles.js';
 import { getRequestUser, isOwner, isStaff } from '../requestUser.js';
+import {
+  notifyOwnersPendingApproval,
+  notifyStaffApproved,
+  notifyStaffChangesRequested,
+} from '../notify.js';
 
 const router = Router();
 
@@ -337,7 +342,11 @@ router.post('/', async (req, res, next) => {
       return id;
     });
 
-    res.status(201).json(await getInvoice(invoiceId));
+    const created = await getInvoice(invoiceId);
+    if (created?.doc_type === 'quotation' && created.status === 'pending_approval') {
+      void notifyOwnersPendingApproval(created);
+    }
+    res.status(201).json(created);
   } catch (err) {
     next(err);
   }
@@ -523,7 +532,15 @@ router.put('/:id', async (req, res, next) => {
       );
     });
 
-    res.json(await getInvoice(req.params.id));
+    const updated = await getInvoice(req.params.id);
+    if (
+      updated?.doc_type === 'quotation' &&
+      updated.status === 'pending_approval' &&
+      existing.status !== 'pending_approval'
+    ) {
+      void notifyOwnersPendingApproval(updated);
+    }
+    res.json(updated);
   } catch (err) {
     next(err);
   }
@@ -564,7 +581,9 @@ router.post('/:id/approve', async (req, res, next) => {
       [actor.username, note, actor.name, req.params.id]
     );
 
-    res.json(await getInvoice(req.params.id));
+    const approved = await getInvoice(req.params.id);
+    void notifyStaffApproved(approved);
+    res.json(approved);
   } catch (err) {
     next(err);
   }
@@ -611,7 +630,9 @@ router.post('/:id/send-back', async (req, res, next) => {
       [actor.username, note, req.params.id]
     );
 
-    res.json(await getInvoice(req.params.id));
+    const sentBack = await getInvoice(req.params.id);
+    void notifyStaffChangesRequested(sentBack);
+    res.json(sentBack);
   } catch (err) {
     next(err);
   }

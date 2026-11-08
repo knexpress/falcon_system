@@ -11,6 +11,7 @@ import dashboardRouter from './routes/dashboard.js';
 import journalRouter from './routes/journal.js';
 import backupsRouter from './routes/backups.js';
 import errorsRouter from './routes/errors.js';
+import devicesRouter from './routes/devices.js';
 import { initDb } from './db.js';
 import {
   captureError,
@@ -125,6 +126,7 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/journal', journalRouter);
 app.use('/api/backups', backupsRouter);
 app.use('/api/errors', errorsRouter);
+app.use('/api/devices', devicesRouter);
 
 // Unknown API route
 app.use('/api', (req, res) => {
@@ -191,9 +193,9 @@ async function start() {
     });
   }
 
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     const db = describeDatabase();
-    console.log(`Garage Finance API running on http://localhost:${PORT}`);
+    console.log(`Garage Finance API running on http://0.0.0.0:${PORT}`);
     console.log(`Using ${db.label}`);
   });
 }

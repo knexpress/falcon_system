@@ -261,6 +261,33 @@ export async function initDb() {
       ON error_logs (created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_error_logs_resolved_at
       ON error_logs (resolved_at);
+
+    CREATE TABLE IF NOT EXISTS device_tokens (
+      id SERIAL PRIMARY KEY,
+      username TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'staff',
+      token TEXT NOT NULL UNIQUE,
+      platform TEXT NOT NULL DEFAULT 'android',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_device_tokens_username
+      ON device_tokens (username);
+
+    CREATE TABLE IF NOT EXISTS app_alerts (
+      id SERIAL PRIMARY KEY,
+      audience_role TEXT,
+      audience_username TEXT,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      data_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+      read_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_app_alerts_created_at
+      ON app_alerts (created_at DESC);
   `);
 
   await ensureColumn('customers', 'trn', 'TEXT');

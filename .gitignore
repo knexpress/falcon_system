@@ -13,6 +13,11 @@ backend/data/
 .env
 .env.*
 !.env.example
+backend/secrets/
+*-firebase-adminsdk-*.json
+fcm-notification-*-firebase-adminsdk-*.json
+/google-services.json
+/fcm-notification-61d29-firebase-adminsdk-fbsvc-b646676362.json
 
 # OS / editor
 .DS_Store

@@ -6,8 +6,9 @@ Complete invoicing and finance system for a car garage. Manage customer invoices
 
 ```
 falcon/
-  backend/   Express + Postgres API
-  frontend/  React + Vite app
+  backend/              Express + Postgres API
+  frontend/             React + Vite web ERP
+  mobile-application/   Flutter Android/iOS app (APK)
 ```
 
 ## Quick start (local)
@@ -36,6 +37,22 @@ npm run dev
 ```
 
 App runs at `http://localhost:5173` and proxies API calls to the backend.
+
+### 3. Mobile (Flutter)
+
+```bash
+cd mobile-application
+flutter pub get
+flutter run --dart-define=API_URL=http://10.0.2.2:4000
+```
+
+Release APK:
+
+```bash
+flutter build apk --release --dart-define=API_URL=https://your-api.onrender.com
+```
+
+Details: `mobile-application/README.md`.
 
 ## Deploy
 
