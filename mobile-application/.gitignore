@@ -17,9 +17,11 @@ coverage/
 .DS_Store
 *.log
 
-# Env
+# Env / Firebase client config (download from Firebase Console)
 .env
 .env.*
+android/app/google-services.json
+**/google-services.json
 
 # Leftover Expo (if present)
 node_modules/

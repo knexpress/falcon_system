@@ -65,9 +65,9 @@ Android always shows a low-importance ongoing notice (“Watching workshop updat
 
 ### Firebase remote push
 
-App Android config is already wired:
+App Android Firebase wiring:
 
-- `android/app/google-services.json`
+- Place `google-services.json` at `android/app/google-services.json` (from Firebase Console; **not** committed)
 - Google services Gradle plugin in `android/settings.gradle.kts` + `android/app/build.gradle.kts`
 - Flutter packages `firebase_core` + `firebase_messaging`
 
