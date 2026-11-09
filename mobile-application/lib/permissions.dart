@@ -4,7 +4,6 @@ class FalconPermissions {
   const FalconPermissions({
     required this.role,
     required this.canViewDashboard,
-    required this.canApproveQuotations,
     required this.canManageQuotations,
     required this.canManageInvoices,
     required this.canViewVehicles,
@@ -19,7 +18,6 @@ class FalconPermissions {
 
   final String role;
   final bool canViewDashboard;
-  final bool canApproveQuotations;
   final bool canManageQuotations;
   final bool canManageInvoices;
   final bool canViewVehicles;
@@ -42,7 +40,6 @@ class FalconPermissions {
         return const FalconPermissions(
           role: 'superadmin',
           canViewDashboard: true,
-          canApproveQuotations: true,
           canManageQuotations: true,
           canManageInvoices: true,
           canViewVehicles: true,
@@ -58,7 +55,6 @@ class FalconPermissions {
         return const FalconPermissions(
           role: 'owner',
           canViewDashboard: true,
-          canApproveQuotations: true,
           // Owner can open quotes/invoices on mobile for oversight
           canManageQuotations: true,
           canManageInvoices: true,
@@ -76,7 +72,6 @@ class FalconPermissions {
         return FalconPermissions(
           role: role.isEmpty ? 'staff' : role,
           canViewDashboard: true,
-          canApproveQuotations: false,
           canManageQuotations: true,
           canManageInvoices: true,
           canViewVehicles: true,
@@ -95,8 +90,6 @@ class FalconPermissions {
     switch (key) {
       case 'Dashboard':
         return canViewDashboard;
-      case 'Approvals':
-        return canApproveQuotations;
       case 'Quotations':
         return canManageQuotations;
       case 'Invoices':

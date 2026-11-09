@@ -184,6 +184,52 @@ class Api {
     return List<dynamic>.from(data as List);
   }
 
+  Future<Map<String, dynamic>> createCustomer(Map<String, dynamic> body) async {
+    final data = await _request('POST', '/customers', body: body);
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<Map<String, dynamic>> createQuotation(Map<String, dynamic> body) async {
+    final data = await _request('POST', '/invoices', body: {
+      ...body,
+      'doc_type': 'quotation',
+    });
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<Map<String, dynamic>> createInvoice(Map<String, dynamic> body) async {
+    final data = await _request('POST', '/invoices', body: {
+      ...body,
+      'doc_type': 'invoice',
+    });
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<Map<String, dynamic>> updateInvoice(
+    Object id,
+    Map<String, dynamic> body,
+  ) async {
+    final data = await _request('PUT', '/invoices/$id', body: body);
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  /// Credit note — same as website DELETE /invoices/:id (keeps record).
+  Future<Map<String, dynamic>> issueCreditNote(Object id) async {
+    final data = await _request('DELETE', '/invoices/$id');
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<Map<String, dynamic>> issueDebitNote(Object id) async {
+    final data = await _request('POST', '/invoices/$id/debit-note', body: {});
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<Map<String, dynamic>> generateInvoiceFromQuotation(Object id) async {
+    final data =
+        await _request('POST', '/invoices/$id/generate-invoice', body: {});
+    return Map<String, dynamic>.from(data as Map);
+  }
+
   Future<List<dynamic>> getSales() async {
     final data = await _request('GET', '/sales');
     return List<dynamic>.from(data as List);

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'auth.dart';
-import 'screens/approvals_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/invoices_screen.dart';
 import 'screens/list_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/quotations_screen.dart';
 import 'widgets/glass.dart';
 
 class FalconAppRoot extends StatelessWidget {
@@ -43,26 +44,10 @@ class _MainShellState extends State<MainShell> {
 
   Widget _page() {
     switch (_active) {
-      case 'Approvals':
-        return const ApprovalsScreen();
       case 'Quotations':
-        return ListScreen(
-          title: 'Quotations',
-          subtitle: 'Awaiting Cedrick or already decided',
-          loader: (api) => api.getQuotations(),
-          mapItem: invoiceMapper,
-          emptyTitle: 'No quotations',
-          emptyBody: 'Create quotations from the desk or wait for submissions.',
-        );
+        return const QuotationsScreen();
       case 'Invoices':
-        return ListScreen(
-          title: 'Invoices',
-          subtitle: 'Tax invoices and approved quotes',
-          loader: (api) => api.getInvoices(),
-          mapItem: invoiceMapper,
-          emptyTitle: 'No invoices',
-          emptyBody: 'Paid and sent invoices will appear here.',
-        );
+        return const InvoicesScreen();
       case 'Vehicles':
         return ListScreen(
           title: 'Vehicles',

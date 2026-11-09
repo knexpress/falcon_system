@@ -20,7 +20,6 @@ import Inventory from './pages/Inventory.jsx';
 import Vehicles from './pages/Vehicles.jsx';
 import VehicleDetail from './pages/VehicleDetail.jsx';
 import Errors from './pages/Errors.jsx';
-import Approvals from './pages/Approvals.jsx';
 import Quotations from './pages/Quotations.jsx';
 import NotFound from './pages/NotFound.jsx';
 
@@ -45,7 +44,7 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
-        <Route path="approvals" element={<Approvals />} />
+        <Route path="approvals" element={<Navigate to="/app/quotations" replace />} />
         <Route path="quotations" element={<Quotations />} />
         <Route
           path="quotations/new"

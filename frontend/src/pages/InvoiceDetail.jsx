@@ -107,7 +107,7 @@ export default function InvoiceDetail() {
           <h1>{invoice.invoice_number}</h1>
           <p>
             {isQuotation
-              ? 'Quotation preview — Cedrick approval required before generating an invoice.'
+              ? 'Quotation preview — use Generate invoice when the client confirms.'
               : 'Preview uses official field positions. Download PDF fills the Falcon Revive fillable template.'}
           </p>
         </div>
@@ -118,7 +118,7 @@ export default function InvoiceDetail() {
           <Link className="btn btn-ghost" to={editPath}>
             Edit
           </Link>
-          {isQuotation && invoice.status === 'approved' && (
+          {isQuotation && invoice.status !== 'cancelled' && (
             <button
               className="btn btn-primary"
               onClick={handleGenerateInvoice}

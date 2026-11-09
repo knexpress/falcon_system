@@ -83,7 +83,6 @@ class NavItem {
 
 const navItems = <NavItem>[
   NavItem('Dashboard', 'Home'),
-  NavItem('Approvals', 'Approvals'),
   NavItem('Quotations', 'Quotes'),
   NavItem('Invoices', 'Invoices'),
   NavItem('Vehicles', 'Vehicles'),

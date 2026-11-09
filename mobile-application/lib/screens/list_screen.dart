@@ -22,6 +22,7 @@ class ListScreen extends StatefulWidget {
     required this.mapItem,
     required this.emptyTitle,
     required this.emptyBody,
+    this.onItemTap,
   });
 
   final String title;
@@ -30,6 +31,7 @@ class ListScreen extends StatefulWidget {
   final ItemMapper mapItem;
   final String emptyTitle;
   final String emptyBody;
+  final Future<void> Function(Map<String, dynamic> row)? onItemTap;
 
   @override
   State<ListScreen> createState() => _ListScreenState();
@@ -67,7 +69,7 @@ class _ListScreenState extends State<ListScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
         children: [
           Text(widget.title,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -91,50 +93,60 @@ class _ListScreenState extends State<ListScreen> {
             ...rows.map((raw) {
               final row = Map<String, dynamic>.from(raw as Map);
               final item = widget.mapItem(row);
+              final card = GlassCard(
+                strong: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(item.title,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 16)),
+                        ),
+                        if (item.badge != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(item.badge!,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700)),
+                          ),
+                      ],
+                    ),
+                    if (item.meta != null) ...[
+                      const SizedBox(height: 4),
+                      Text(item.meta!,
+                          style:
+                              const TextStyle(color: FalconColors.muted)),
+                    ],
+                    if (item.value != null) ...[
+                      const SizedBox(height: 8),
+                      Text(item.value!,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 16)),
+                    ],
+                  ],
+                ),
+              );
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: GlassCard(
-                  strong: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(item.title,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700, fontSize: 16)),
-                          ),
-                          if (item.badge != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.7),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(item.badge!,
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700)),
-                            ),
-                        ],
+                child: widget.onItemTap == null
+                    ? card
+                    : Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(22),
+                          onTap: () => widget.onItemTap!(row),
+                          child: card,
+                        ),
                       ),
-                      if (item.meta != null) ...[
-                        const SizedBox(height: 4),
-                        Text(item.meta!,
-                            style:
-                                const TextStyle(color: FalconColors.muted)),
-                      ],
-                      if (item.value != null) ...[
-                        const SizedBox(height: 8),
-                        Text(item.value!,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w800, fontSize: 16)),
-                      ],
-                    ],
-                  ),
-                ),
               );
             }),
         ],

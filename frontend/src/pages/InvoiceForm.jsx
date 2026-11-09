@@ -333,14 +333,7 @@ export default function InvoiceForm({ forceDocType } = {}) {
       <div className={showPreview ? 'invoice-workbench' : ''}>
         <form className="panel" onSubmit={handleSubmit}>
           {error && <div className="error-banner">{error}</div>}
-          {isQuotation && docStatus === 'changes_requested' && ownerNote && (
-            <div className="error-banner">
-              <strong>Cedrick asked for changes:</strong> {ownerNote}
-              <br />
-              Edit the quotation and save — it will go back to Approvals.
-            </div>
-          )}
-          {isQuotation && docStatus !== 'changes_requested' && (
+          {isQuotation && (
             <div
               className="success-banner"
               style={{
@@ -349,10 +342,9 @@ export default function InvoiceForm({ forceDocType } = {}) {
                 borderColor: 'rgba(183, 121, 31, 0.35)',
               }}
             >
-              This quotation will wait in Approvals for Cedrick. After he
-              approves it, use <strong>Generate invoice</strong> on the Invoices
-              page. A draft journal line is created now; it posts when the
-              invoice is generated.
+              Save this quotation, then open it and tap{' '}
+              <strong>Generate invoice</strong> to create the tax invoice
+              directly. Journal posts when the invoice is generated.
             </div>
           )}
 

@@ -10,7 +10,6 @@ import { syncInvoiceSale } from '../syncInvoiceSale.js';
 import { upsertVehicleFromInvoice } from '../vehicles.js';
 import { getRequestUser, isOwner, isStaff } from '../requestUser.js';
 import {
-  notifyOwnersPendingApproval,
   notifyStaffApproved,
   notifyStaffChangesRequested,
 } from '../notify.js';
@@ -79,10 +78,13 @@ router.get('/', async (req, res, next) => {
     } else if (docType === 'all') {
       // no doc_type filter
     } else if (docType === 'invoice_board') {
-      // Invoices page: real invoices + approved quotations ready to convert
+      // Invoices page: real invoices + open quotations ready to convert
       sql += ` AND (
         COALESCE(i.doc_type, 'invoice') = 'invoice'
-        OR (i.doc_type = 'quotation' AND i.status = 'approved')
+        OR (
+          i.doc_type = 'quotation'
+          AND COALESCE(i.status, '') NOT IN ('cancelled')
+        )
       )`;
     } else {
       sql += ` AND COALESCE(i.doc_type, 'invoice') = 'invoice'`;
@@ -227,16 +229,24 @@ router.post('/', async (req, res, next) => {
     }
 
     const totals = calcTotals(items, tax_rate, discount);
-    // Staff always create quotations; owner may create invoice or quotation
-    const wantsQuotation =
-      String(bodyDocType || '').toLowerCase() === 'quotation' || isStaff(actor);
+    // Respect explicit doc_type. Staff default to quotation; owners may create either.
+    const explicitType = String(bodyDocType || '').toLowerCase();
+    let wantsQuotation;
+    if (explicitType === 'quotation') {
+      wantsQuotation = true;
+    } else if (explicitType === 'invoice') {
+      wantsQuotation = false;
+    } else {
+      wantsQuotation = isStaff(actor) && !isOwner(actor);
+    }
     const docType = wantsQuotation ? 'quotation' : 'invoice';
     const invoiceNumber = wantsQuotation
       ? await nextQuotationNumber()
       : await nextInvoiceNumber();
     const requestedStatus = normalizeRequestedStatus(status);
+    // No approval queue — quotations save as a normal desk status (usually sent)
     const validStatus = wantsQuotation
-      ? 'pending_approval'
+      ? requestedStatus
       : ALL_STATUSES.includes(status)
         ? status
         : 'draft';
@@ -296,7 +306,7 @@ router.post('/', async (req, res, next) => {
           totals.subtotal,
           totals.total,
           createdBy,
-          wantsQuotation ? requestedStatus : null,
+          null,
           docType,
           journalStatus,
         ],
@@ -343,9 +353,6 @@ router.post('/', async (req, res, next) => {
     });
 
     const created = await getInvoice(invoiceId);
-    if (created?.doc_type === 'quotation' && created.status === 'pending_approval') {
-      void notifyOwnersPendingApproval(created);
-    }
     res.status(201).json(created);
   } catch (err) {
     next(err);
@@ -418,29 +425,21 @@ router.put('/:id', async (req, res, next) => {
     }
 
     const totals = calcTotals(items, tax_rate, discount);
-    const requestedStatus = normalizeRequestedStatus(
-      status || existing.requested_status || existing.status
-    );
-    const isQuote = existing.doc_type === 'quotation';
+    // Keep quotation/invoice status as a normal desk status (no approval queue)
     let validStatus = ALL_STATUSES.includes(status)
       ? status
       : existing.status;
-    let nextRequested = existing.requested_status || null;
-
-    if (isQuote) {
-      // Staff edits (including after send-back) re-submit to Cedrick
-      if (
-        isStaff(actor) ||
-        existing.status === 'pending_approval' ||
-        existing.status === 'changes_requested'
-      ) {
-        validStatus = 'pending_approval';
-        nextRequested = requestedStatus;
-      } else if (existing.status === 'approved' && isOwner(actor)) {
-        validStatus = 'approved';
-        nextRequested = requestedStatus;
-      }
+    if (
+      existing.doc_type === 'quotation' &&
+      ['pending_approval', 'changes_requested', 'approved'].includes(
+        String(validStatus)
+      )
+    ) {
+      validStatus = normalizeRequestedStatus(
+        status || existing.requested_status || 'sent'
+      );
     }
+    const nextRequested = null;
 
     await withTransaction(async (client) => {
       const vehicleId = await upsertVehicleFromInvoice(
@@ -533,13 +532,6 @@ router.put('/:id', async (req, res, next) => {
     });
 
     const updated = await getInvoice(req.params.id);
-    if (
-      updated?.doc_type === 'quotation' &&
-      updated.status === 'pending_approval' &&
-      existing.status !== 'pending_approval'
-    ) {
-      void notifyOwnersPendingApproval(updated);
-    }
     res.json(updated);
   } catch (err) {
     next(err);
@@ -643,14 +635,19 @@ router.post('/:id/generate-invoice', async (req, res, next) => {
     const actor = await getRequestUser(req);
     const existing = await getInvoice(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Quotation not found' });
-    if (existing.doc_type !== 'quotation' || existing.status !== 'approved') {
+    if (existing.doc_type !== 'quotation') {
       return res.status(400).json({
-        error: 'Only Cedrick-approved quotations can generate an invoice.',
+        error: 'Only quotations can generate an invoice.',
+      });
+    }
+    if (String(existing.status).toLowerCase() === 'cancelled') {
+      return res.status(400).json({
+        error: 'Cancelled quotations cannot generate an invoice.',
       });
     }
 
     const nextStatus = normalizeRequestedStatus(
-      req.body?.status || existing.requested_status || 'sent'
+      req.body?.status || existing.requested_status || existing.status || 'sent'
     );
     const invoiceNumber = await nextInvoiceNumber();
 

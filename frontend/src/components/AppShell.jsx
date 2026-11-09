@@ -16,21 +16,15 @@ const nav = [
     icon: 'home',
   },
   {
-    to: '/app/approvals',
-    label: 'Approvals',
-    roles: ['owner'],
-    icon: 'check',
-  },
-  {
     to: '/app/quotations',
     label: 'Quotations',
-    roles: ['staff'],
+    roles: ['owner', 'staff', 'superadmin'],
     icon: 'quote',
   },
   {
     to: '/app/invoices',
     label: 'Invoices',
-    roles: ['staff'],
+    roles: ['owner', 'staff', 'superadmin'],
     icon: 'invoice',
   },
   {

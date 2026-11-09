@@ -184,8 +184,8 @@ export default function Invoices() {
         <div>
           <h1>Invoices</h1>
           <p>
-            Tax invoices and Cedrick-approved quotations ready to convert.
-            Start new jobs from Quotations.
+            Tax invoices and open quotations ready to convert. Start new jobs
+            from Quotations.
           </p>
         </div>
         <div className="row-actions">
@@ -310,7 +310,6 @@ export default function Invoices() {
             onChange={(e) => setStatus(e.target.value)}
           >
             <option value="">All statuses</option>
-            <option value="approved">Approved quotation</option>
             <option value="draft">Draft</option>
             <option value="sent">Sent</option>
             <option value="paid">Paid</option>
@@ -358,8 +357,8 @@ export default function Invoices() {
                   <td>{formatDate(inv.issue_date)}</td>
                   <td>
                     <span className={`badge ${inv.status}`}>
-                      {inv.doc_type === 'quotation' && inv.status === 'approved'
-                        ? 'Approved quotation'
+                      {inv.doc_type === 'quotation'
+                        ? `Quotation · ${inv.status}`
                         : inv.status === 'credit_note'
                           ? 'Credit note'
                           : inv.status === 'debit_note'
@@ -371,7 +370,7 @@ export default function Invoices() {
                   <td>
                     <div className="row-actions row-actions-inline">
                       {inv.doc_type === 'quotation' &&
-                      inv.status === 'approved' ? (
+                      inv.status !== 'cancelled' ? (
                         <button
                           className="btn btn-primary btn-sm"
                           disabled={genBusyId === inv.id}

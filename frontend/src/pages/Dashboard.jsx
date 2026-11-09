@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, formatDate, formatMoney } from '../api.js';
 import { getAuth } from '../components/RequireAuth.jsx';
-import { isOwnerRole, isStaffRole } from '../roles.js';
+import { isStaffRole } from '../roles.js';
 
 function initials(name) {
   return String(name || 'FR')
@@ -156,7 +156,6 @@ function PerformanceChart({ income, expenses, profit }) {
 
 export default function Dashboard() {
   const auth = getAuth();
-  const ownerLike = isOwnerRole(auth?.role);
   const staffLike = isStaffRole(auth?.role);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -193,12 +192,9 @@ export default function Dashboard() {
           <p>Workshop cashflow, invoices, and books at a glance.</p>
         </div>
         <div className="row-actions">
-          {ownerLike && (
-            <Link className="btn btn-ghost" to="/app/approvals">
-              Approvals
-              {data.pending_approvals ? ` (${data.pending_approvals})` : ''}
-            </Link>
-          )}
+          <Link className="btn btn-ghost" to="/app/quotations">
+            Quotations
+          </Link>
           {staffLike && (
             <Link className="btn btn-primary" to="/app/invoices/new">
               New invoice
@@ -206,18 +202,6 @@ export default function Dashboard() {
           )}
         </div>
       </header>
-
-      {ownerLike && Number(data.pending_approvals) > 0 && (
-        <div className="backup-login-notice glass-notice" style={{ marginBottom: 16 }}>
-          <div>
-            <strong>{data.pending_approvals}</strong> quotation
-            {data.pending_approvals === 1 ? '' : 's'} waiting for your approval.
-          </div>
-          <Link className="btn btn-primary btn-sm" to="/app/approvals">
-            Review now
-          </Link>
-        </div>
-      )}
 
       <div className="dash-mosaic">
         <div className="dash-stack">
@@ -374,11 +358,6 @@ export default function Dashboard() {
               <span className="chip soft">
                 {data.low_stock_count || 0} low stock
               </span>
-              {ownerLike && Number(data.pending_approvals) > 0 ? (
-                <Link className="chip soft" to="/app/approvals">
-                  {data.pending_approvals} to approve
-                </Link>
-              ) : null}
             </div>
           </section>
         </div>
@@ -391,17 +370,9 @@ export default function Dashboard() {
               {data.recent_invoices.length === 0 ? (
                 <EmptyHint
                   title="No invoices yet"
-                  body={
-                    staffLike
-                      ? 'Create a quotation or tax invoice to see customers and totals land here.'
-                      : 'Once Mariel or Arnie issue invoices, the latest five appear in this list for a quick check.'
-                  }
-                  actionTo={
-                    staffLike ? '/app/invoices/new' : '/app/approvals'
-                  }
-                  actionLabel={
-                    staffLike ? 'New invoice' : 'Open approvals'
-                  }
+                  body="Create a quotation or tax invoice to see customers and totals land here."
+                  actionTo="/app/quotations/new"
+                  actionLabel="New quotation"
                 />
               ) : (
                 data.recent_invoices.map((inv) => (

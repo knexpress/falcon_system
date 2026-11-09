@@ -1,21 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, formatDate, formatMoney } from '../api.js';
 
-function statusLabel(status) {
-  if (status === 'pending_approval') return 'Pending approval';
-  if (status === 'approved') return 'Approved';
-  if (status === 'changes_requested') return 'Changes requested';
-  if (status === 'rejected') return 'Rejected';
-  return status;
-}
-
 export default function Quotations() {
+  const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [status, setStatus] = useState('');
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [genBusyId, setGenBusyId] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -36,14 +30,34 @@ export default function Quotations() {
     load();
   }, [status]);
 
+  async function handleGenerateInvoice(row) {
+    if (
+      !window.confirm(
+        `Generate tax invoice from ${row.invoice_number}? This posts the journal entry.`
+      )
+    ) {
+      return;
+    }
+    setGenBusyId(row.id);
+    setError('');
+    try {
+      const created = await api.generateInvoiceFromQuotation(row.id);
+      navigate(`/app/invoices/${created.id}`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGenBusyId(null);
+    }
+  }
+
   return (
     <div>
       <header className="page-header">
         <div>
           <h1>Quotations</h1>
           <p>
-            Create job quotations. They go to Cedrick for approval, then appear
-            on Invoices so you can generate the tax invoice.
+            Create a quotation, then use <strong>Generate invoice</strong> to
+            turn it into a tax invoice — no approval step.
           </p>
         </div>
         <Link className="btn btn-primary" to="/app/quotations/new">
@@ -68,9 +82,9 @@ export default function Quotations() {
             onChange={(e) => setStatus(e.target.value)}
           >
             <option value="">All statuses</option>
-            <option value="pending_approval">Pending approval</option>
-            <option value="changes_requested">Changes requested</option>
-            <option value="approved">Approved</option>
+            <option value="draft">Draft</option>
+            <option value="sent">Sent</option>
+            <option value="cancelled">Cancelled</option>
           </select>
           <button className="btn btn-ghost" onClick={load}>
             Search
@@ -93,7 +107,6 @@ export default function Quotations() {
                 <th>Vehicle</th>
                 <th>Issue date</th>
                 <th>Status</th>
-                <th>Journal</th>
                 <th>Total</th>
                 <th></th>
               </tr>
@@ -116,19 +129,7 @@ export default function Quotations() {
                   </td>
                   <td>{formatDate(row.issue_date)}</td>
                   <td>
-                    <span className={`badge ${row.status}`}>
-                      {statusLabel(row.status)}
-                    </span>
-                    {row.status === 'changes_requested' && row.approval_note ? (
-                      <div className="muted" style={{ fontSize: '0.82rem', marginTop: 4 }}>
-                        {row.approval_note}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>
-                    <span className="badge draft">
-                      {row.journal_status || 'draft'}
-                    </span>
+                    <span className={`badge ${row.status}`}>{row.status}</span>
                   </td>
                   <td>{formatMoney(row.total)}</td>
                   <td>
@@ -139,13 +140,16 @@ export default function Quotations() {
                       >
                         Edit
                       </Link>
-                      {row.status === 'approved' && (
-                        <Link
+                      {row.status !== 'cancelled' && (
+                        <button
                           className="btn btn-primary btn-sm"
-                          to="/app/invoices"
+                          disabled={genBusyId === row.id}
+                          onClick={() => handleGenerateInvoice(row)}
                         >
-                          Go to invoices
-                        </Link>
+                          {genBusyId === row.id
+                            ? 'Generating…'
+                            : 'Generate invoice'}
+                        </button>
                       )}
                     </div>
                   </td>

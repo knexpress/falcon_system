@@ -156,16 +156,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
-            if (auth?.isOwner == true &&
-                (d['pending_approvals'] as num? ?? 0) > 0) ...[
-              const SizedBox(height: 12),
-              GlassCard(
-                child: Text(
-                  '${d['pending_approvals']} quotation(s) waiting — open Approvals.',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
           ],
         ],
       ),
