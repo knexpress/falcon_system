@@ -16,9 +16,12 @@ export function parseInvoiceNumber(value) {
 }
 
 export async function nextInvoiceNumber() {
+  // Scan every non-QT number so legacy quotations that reused the
+  // invoice series (e.g. 00297) cannot collide on generate-invoice.
   const rows = await all(
     `SELECT invoice_number FROM invoices
-     WHERE COALESCE(doc_type, 'invoice') = 'invoice'`
+     WHERE invoice_number IS NOT NULL
+       AND invoice_number NOT ILIKE 'QT-%'`
   );
   let max = INVOICE_SERIES_START - 1;
   for (const row of rows) {
@@ -26,6 +29,13 @@ export async function nextInvoiceNumber() {
     if (n !== null && n > max) max = n;
   }
   return formatInvoiceNumber(max + 1);
+}
+
+/** True when the document already carries an invoice-series number. */
+export function isInvoiceSeriesNumber(value) {
+  const raw = String(value || '').trim();
+  if (!raw || /^QT-/i.test(raw)) return false;
+  return parseInvoiceNumber(raw) !== null;
 }
 
 /** Quotation series: QT-00001, QT-00002, … */

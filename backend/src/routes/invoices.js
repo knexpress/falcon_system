@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { get, all, run, withTransaction } from '../db.js';
 import {
   calcTotals,
+  isInvoiceSeriesNumber,
   nextInvoiceNumber,
   nextQuotationNumber,
 } from '../utils.js';
@@ -649,7 +650,11 @@ router.post('/:id/generate-invoice', async (req, res, next) => {
     const nextStatus = normalizeRequestedStatus(
       req.body?.status || existing.requested_status || existing.status || 'sent'
     );
-    const invoiceNumber = await nextInvoiceNumber();
+    // Keep legacy quote numbers that already sit in the invoice series
+    // (unique). Only mint a new number for QT-… quotations.
+    const invoiceNumber = isInvoiceSeriesNumber(existing.invoice_number)
+      ? String(existing.invoice_number).trim()
+      : await nextInvoiceNumber();
 
     await withTransaction(async (client) => {
       await run(
@@ -660,7 +665,7 @@ router.post('/:id/generate-invoice', async (req, res, next) => {
           journal_status = 'posted',
           authorized_by = COALESCE(authorized_by, ?),
           updated_at = NOW()
-         WHERE id = ?`,
+         WHERE id = ? AND doc_type = 'quotation'`,
         [
           invoiceNumber,
           nextStatus,
